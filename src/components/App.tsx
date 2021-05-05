@@ -8,7 +8,7 @@ import { Navbar } from "src/components/Navbar";
 import { Sidebar } from "src/components/Sidebar";
 import { NonogramBoard } from "src/components/NonogramBoard";
 
-import { generateHumanSolveableNonogram } from "src/nonogram/nonogram_generator";
+import { generateRandomNonogram } from "src/nonogram/nonogram_generator";
 import * as utils from "src/utils/common";
 
 const appStyle = css`
@@ -22,7 +22,7 @@ const appStyle = css`
 
 export function App() {
   // TODO: fix this
-  const [activeNonogram, setActiveNonogram] = useState(() => generateHumanSolveableNonogram(10));
+  const [activeNonogram, setActiveNonogram] = useState(() => generateRandomNonogram(10, 0.75));
 
   const onCellUpdated = useCallback((row, col, newCellState) => {
     setActiveNonogram((oldActiveNonogram) => {

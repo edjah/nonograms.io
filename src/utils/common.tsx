@@ -19,3 +19,7 @@ export function deepClone<T>(obj: T): T {
 export function deepEqual(left: unknown, right: unknown): boolean {
   return lodashDeepEqual(left, right);
 }
+
+export function setTimeoutAsync(duration: number): Promise<void> {
+  return new Promise((cb) => setTimeout(cb, duration));
+}

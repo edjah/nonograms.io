@@ -1,36 +1,65 @@
-import * as utils from "src/utils/common";
 import { Nonogram, CellState } from "src/nonogram/nonogram_types";
 import { solveNonogramUsingLogic } from "src/nonogram/nonogram_solver";
 
-/** This is not guaranteed to generate a solveable game. */
-function generateRandomNonogram(size: number): Nonogram {
-  const nonogram: Nonogram = { rowCounts: [], colCounts: [], cells: [] };
+/**
+ * This will generate a solveable nonogram, but it may not have a unique solution. Additionally, it
+ * may generate a nonogram that requires guessing or very advanced techniques that go beyond
+ * standard human abilities.
+ */
+export function generateRandomNonogram(size: number, fillProbability: number = 0.75): Nonogram {
+  const solvedNonogramCells: Array<Array<CellState>> = [];
+  for (let row = 0; row < size; ++row) {
+    solvedNonogramCells.push([]);
+    for (let col = 0; col < size; ++col) {
+      solvedNonogramCells[row].push(
+        Math.random() < fillProbability ? CellState.FILLED : CellState.CROSSED_OUT
+      );
+    }
+  }
 
-  function generateCellSectionSizes() {
-    const numSections = utils.randInt(1, Math.ceil(size / 2));
-    const sectionSizes: Array<number> = [];
-    let spacesRemaining = size;
+  const unsolvedNonogram: Nonogram = { rowCounts: [], colCounts: [], cells: [] };
+  for (let i = 0; i < size; ++i) {
+    const rowCounts: Array<number> = [];
+    const colCounts: Array<number> = [];
 
-    for (let i = 0; i < numSections && spacesRemaining > 0; ++i) {
-      const sectionSize = utils.randInt(1, spacesRemaining + 1);
-      sectionSizes.push(sectionSize);
-      spacesRemaining -= sectionSize;
+    let rowStreak = 0;
+    let colStreak = 0;
 
-      // Subtract an additional 1 because we need a space between sections
-      spacesRemaining -= 1;
+    for (let j = 0; j < size; ++j) {
+      if (solvedNonogramCells[i][j] === CellState.FILLED) {
+        rowStreak += 1;
+      } else if (rowStreak > 0) {
+        rowCounts.push(rowStreak);
+        rowStreak = 0;
+      }
+
+      if (solvedNonogramCells[j][i] === CellState.FILLED) {
+        colStreak += 1;
+      } else if (colStreak > 0) {
+        colCounts.push(colStreak);
+        colStreak = 0;
+      }
     }
 
-    return sectionSizes;
+    if (rowStreak > 0) {
+      rowCounts.push(rowStreak);
+    }
+    if (colStreak > 0) {
+      colCounts.push(colStreak);
+    }
+
+    // If we ended up generating a nonogram with a row or column that doesn't have any filled cells,
+    // try again.
+    if (rowCounts.length === 0 || colCounts.length === 0) {
+      return generateRandomNonogram(size, fillProbability);
+    }
+
+    unsolvedNonogram.rowCounts.push(rowCounts);
+    unsolvedNonogram.colCounts.push(colCounts);
+    unsolvedNonogram.cells.push(Array(size).fill(CellState.BLANK));
   }
 
-  for (let i = 0; i < size; ++i) {
-    // TODO: generate nonograms that have some crossed out cells to start
-    nonogram.cells.push(Array(size).fill(CellState.BLANK));
-    nonogram.rowCounts.push(generateCellSectionSizes());
-    nonogram.colCounts.push(generateCellSectionSizes());
-  }
-
-  return nonogram;
+  return unsolvedNonogram;
 }
 
 /**
@@ -46,6 +75,5 @@ export function generateHumanSolveableNonogram(size: number): Nonogram {
     if (solution) {
       return nonogram;
     }
-    return nonogram; // TODO: remove
   }
 }

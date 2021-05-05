@@ -1,6 +1,6 @@
 /** @jsxImportSource @emotion/react */
 import { Global, css } from "@emotion/react";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import common from "src/static/css/common.css";
 import fonts from "src/static/css/fonts.css";
 import normalize from "src/static/css/normalize.css";
@@ -24,6 +24,14 @@ export function App() {
   // TODO: fix this
   const [activeNonogram, setActiveNonogram] = useState(() => generateHumanSolveableNonogram(10));
 
+  const onCellUpdated = useCallback((row, col, newCellState) => {
+    setActiveNonogram((oldActiveNonogram) => {
+      const newNonogram = utils.deepClone(oldActiveNonogram);
+      newNonogram.cells[row][col] = newCellState;
+      return newNonogram;
+    });
+  }, []);
+
   return (
     <div css={appStyle}>
       <Global
@@ -36,14 +44,7 @@ export function App() {
       <Navbar />
       <div className="inner-app">
         <Sidebar />
-        <NonogramBoard
-          nonogram={activeNonogram}
-          onCellUpdated={(row, col, newCellState) => {
-            const newNonogram = utils.deepClone(activeNonogram);
-            newNonogram.cells[row][col] = newCellState;
-            setActiveNonogram(newNonogram);
-          }}
-        />
+        <NonogramBoard nonogram={activeNonogram} onCellUpdated={onCellUpdated} />
       </div>
     </div>
   );

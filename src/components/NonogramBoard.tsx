@@ -1,8 +1,9 @@
 /** @jsxImportSource @emotion/react */
 import { css } from "@emotion/react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Nonogram, CellState } from "src/nonogram/nonogram_types";
 import { colors } from "src/theme";
+import * as utils from "src/utils/common";
 
 // TODO: improve these styles
 const nonogramBoardStyle = css`
@@ -41,6 +42,15 @@ const nonogramBoardStyle = css`
   }
 `;
 
+type CellUpdateAction = {
+  originalCellState: CellState;
+  updatedCellState: CellState;
+  startRow: number;
+  startCol: number;
+  dragDirection: "vertical" | "horizontal" | null;
+  affectedCells: Array<{ row: number; col: number }>;
+};
+
 type NonogramBoardProps = {
   nonogram: Nonogram;
   onCellUpdated: (row: number, col: number, newCellState: CellState) => void;
@@ -48,62 +58,126 @@ type NonogramBoardProps = {
 
 export function NonogramBoard(props: NonogramBoardProps) {
   const { nonogram, onCellUpdated } = props;
-  const [draggingState, setDraggingState] = useState<{
-    originalDragState: CellState;
-    updatedState: CellState;
-    startRow: number;
-    startCol: number;
-    dragDirection: "vertical" | "horizontal" | null;
-  } | null>(null);
+  const [actionState, setActionState] = useState<CellUpdateAction | null>(null);
+  const actionLog = useRef<Array<CellUpdateAction>>([]);
+  const numValidActionsInLog = useRef<number>(0);
+
+  const undoLastAction = useCallback(() => {
+    if (numValidActionsInLog.current > 0) {
+      const actionToUndo = actionLog.current[--numValidActionsInLog.current];
+      for (const { row, col } of actionToUndo.affectedCells) {
+        onCellUpdated(row, col, actionToUndo.originalCellState);
+      }
+    }
+  }, [onCellUpdated]);
+
+  const redoAction = useCallback(() => {
+    if (numValidActionsInLog.current < actionLog.current.length) {
+      const actionToRedo = actionLog.current[numValidActionsInLog.current++];
+      for (const { row, col } of actionToRedo.affectedCells) {
+        onCellUpdated(row, col, actionToRedo.updatedCellState);
+      }
+    }
+  }, [onCellUpdated]);
 
   useEffect(() => {
-    const onMouseUp = () => setDraggingState(null);
+    const onMouseUp = () => {
+      setActionState((oldActionState) => {
+        if (oldActionState) {
+          // React is running this function multiple times, so we need to check that the last
+          // action log entry is not identical to the current action state to avoid duplicates.
+          // TODO: figure out why this is running multiple times.
+          actionLog.current.splice(numValidActionsInLog.current);
+          const lastLoggedAction = actionLog.current[actionLog.current.length - 1];
+          if (!utils.deepEqual(lastLoggedAction, oldActionState)) {
+            actionLog.current.push(oldActionState);
+            numValidActionsInLog.current = actionLog.current.length;
+          }
+        }
+        return null;
+      });
+    };
+
+    // TODO: make sure this doesn't mess with any text boxes
+    const onKeyDown = (event: KeyboardEvent) => {
+      switch (event.code) {
+        case "KeyZ":
+          if (event.ctrlKey || event.metaKey) {
+            if (event.shiftKey) {
+              redoAction();
+            } else {
+              undoLastAction();
+            }
+          }
+          break;
+
+        case "KeyY":
+          if (event.ctrlKey || event.metaKey) {
+            redoAction();
+            event.preventDefault();
+          }
+          break;
+
+        default:
+          break;
+      }
+    };
+
     window.addEventListener("mouseup", onMouseUp);
-    return () => window.removeEventListener("mouseup", onMouseUp);
-  }, []);
+    window.addEventListener("keydown", onKeyDown);
+
+    return () => {
+      window.removeEventListener("mouseup", onMouseUp);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [undoLastAction, redoAction]);
 
   const onMouseDown = useCallback(
     (row: number, col: number, currentCellState: CellState, mouseButton: number) => {
       // mouseButton of 0 -> left click | mouseButton of 2 -> right click
       if (mouseButton !== 0 && mouseButton !== 2) {
-        setDraggingState(null);
+        setActionState(null);
         return;
       }
 
-      let updatedState: CellState;
+      let updatedCellState: CellState;
       if (mouseButton === 0) {
-        updatedState = currentCellState === CellState.FILLED ? CellState.BLANK : CellState.FILLED;
+        updatedCellState =
+          currentCellState === CellState.FILLED ? CellState.BLANK : CellState.FILLED;
       } else {
-        updatedState =
+        updatedCellState =
           currentCellState === CellState.CROSSED_OUT ? CellState.BLANK : CellState.CROSSED_OUT;
       }
 
-      setDraggingState({
-        originalDragState: currentCellState,
-        updatedState,
+      setActionState({
+        originalCellState: currentCellState,
+        updatedCellState,
         startRow: row,
         startCol: col,
         dragDirection: null,
+        affectedCells: [{ row, col }],
       });
 
-      onCellUpdated(row, col, updatedState);
+      onCellUpdated(row, col, updatedCellState);
     },
     [onCellUpdated]
   );
 
   const onMouseOver = useCallback(
     (row: number, col: number) => {
-      if (!draggingState) {
+      if (!actionState) {
         return;
       }
-      const { originalDragState, updatedState, startRow, startCol, dragDirection } = draggingState;
+      const { originalCellState, updatedCellState, startRow, startCol } = actionState;
 
       // When we're dragging, we only allow one row or one column at a time to be modified to reduce
       // the chance of accidental changes.
+      let { dragDirection } = actionState;
       if (dragDirection === null && (row !== startRow || col !== startCol)) {
-        setDraggingState({
-          ...draggingState,
-          dragDirection: row !== startRow ? "vertical" : "horizontal",
+        dragDirection = row !== startRow ? "vertical" : "horizontal";
+        setActionState({
+          ...actionState,
+          dragDirection,
         });
       }
 
@@ -119,11 +193,16 @@ export function NonogramBoard(props: NonogramBoardProps) {
       // Additionally, we only update a cell's state from X to Y if the cell that started the drag
       // was originally in state X.
       const targetCellState = nonogram.cells[targetRow][targetCol];
-      if (targetCellState === originalDragState) {
-        onCellUpdated(targetRow, targetCol, updatedState);
+      if (targetCellState === originalCellState) {
+        setActionState({
+          ...actionState,
+          dragDirection,
+          affectedCells: [...actionState.affectedCells, { row: targetRow, col: targetCol }],
+        });
+        onCellUpdated(targetRow, targetCol, updatedCellState);
       }
     },
-    [draggingState, nonogram, onCellUpdated]
+    [actionState, nonogram, onCellUpdated]
   );
 
   const renderedCells = [];

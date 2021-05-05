@@ -13,29 +13,77 @@ const nonogramBoardStyle = css`
   justify-content: center;
   align-items: center;
 
-  .cellGrid {
-    display: grid;
-    gap: 0px;
-    color: ${colors.gray};
+  .gameBoard {
+    .cellGrid {
+      display: grid;
+      gap: 0px;
+      color: ${colors.gray};
 
-    .cell {
-      border: 1px solid ${colors.black};
+      .cell {
+        width: 100%;
+        height: 100%;
+        border: 1px solid ${colors.black};
 
-      &.${CellState.BLANK} {
-        background-color: ${colors.white};
+        &.${CellState.BLANK} {
+          background-color: ${colors.white};
+        }
+
+        &.${CellState.FILLED} {
+          background-color: ${colors.gray};
+        }
+
+        &.${CellState.CROSSED_OUT} {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+
+          :after {
+            content: "×";
+          }
+        }
       }
+    }
 
-      &.${CellState.FILLED} {
-        background-color: ${colors.gray};
-      }
+    // TODO: make these pixel values responsive
+    .rowCounts,
+    .colCounts {
+      user-select: none;
+      font-size: 20px;
+    }
 
-      &.${CellState.CROSSED_OUT} {
+    .rowCounts {
+      float: left;
+      margin-right: 5px;
+
+      > div {
         display: flex;
+        flex-direction: row;
         align-items: center;
-        justify-content: center;
+        justify-content: flex-end;
+        height: 40px;
 
-        :after {
-          content: "×";
+        > div {
+          padding-left: 7px;
+        }
+      }
+    }
+
+    .colCounts {
+      display: flex;
+      flex-direction: row;
+      align-items: flex-end;
+      justify-content: flex-end;
+      margin-bottom: 5px;
+
+      > div {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-end;
+        width: 40px;
+
+        > div {
+          padding-top: 3px;
         }
       }
     }
@@ -224,17 +272,37 @@ export function NonogramBoard(props: NonogramBoardProps) {
   const gridCellSize = "40px"; // TODO: make this responsive
   return (
     <div css={nonogramBoardStyle} onContextMenu={(e) => e.preventDefault()}>
-      <div>
-        <div
-          onDragStart={(e) => e.preventDefault()}
-          className="cellGrid"
-          css={css`
-            grid-template-columns: repeat(${colCounts.length}, ${gridCellSize});
-            grid-template-rows: repeat(${rowCounts.length}, ${gridCellSize});
-            font-size: ${gridCellSize};
-          `}
-        >
-          {renderedCells}
+      <div className="gameBoard">
+        <div className="colCounts">
+          {colCounts.map((counts, col) => (
+            <div key={col}>
+              {counts.map((count, i) => (
+                <div key={i}>{count}</div>
+              ))}
+            </div>
+          ))}
+        </div>
+        <div>
+          <div className="rowCounts">
+            {rowCounts.map((counts, row) => (
+              <div key={row}>
+                {counts.map((count, i) => (
+                  <div key={i}>{count}</div>
+                ))}
+              </div>
+            ))}
+          </div>
+          <div
+            onDragStart={(e) => e.preventDefault()}
+            className="cellGrid"
+            css={css`
+              grid-template-columns: repeat(${colCounts.length}, ${gridCellSize});
+              grid-template-rows: repeat(${rowCounts.length}, ${gridCellSize});
+              font-size: ${gridCellSize};
+            `}
+          >
+            {renderedCells}
+          </div>
         </div>
       </div>
     </div>

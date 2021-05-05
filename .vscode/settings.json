@@ -1,0 +1,38 @@
+{
+  // Spacing options.
+  "editor.insertSpaces": true,
+  "editor.tabSize": 4,
+  "editor.rulers": [100],
+  "editor.wordWrap": "off",
+  "files.trimTrailingWhitespace": true,
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+
+  // Render Markdown like prose with word wrapping.
+  "[markdown]": {
+    "editor.wordWrap": "wordWrapColumn",
+    "editor.wordWrapColumn": 80,
+    "editor.rulers": [80]
+  },
+
+  // Use eslint to validate TypeScript files in addition to JavaScript files.
+  "eslint.validate": [
+    "javascript",
+    "javascriptreact",
+    "typescript",
+    "typescriptreact"
+  ],
+
+  // Make sure we see unused directives.
+  "eslint.options": {
+    "reportUnusedDisableDirectives": true
+  },
+
+  // Don’t automatically detect tasks.
+  "npm.autoDetect": "off",
+  "typescript.tsc.autoDetect": "off",
+
+  // Use non-relative paths for auto-imports.
+  "javascript.preferences.importModuleSpecifier": "non-relative",
+  "typescript.preferences.importModuleSpecifier": "non-relative"
+}

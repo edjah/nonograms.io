@@ -6,7 +6,8 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "runAdminScript": "yarn run --silent ts-node --compiler-options '{\"isolatedModules\": null, \"target\": null, \"module\": null}' src/scripts/index.tsx"
   },
   "eslintConfig": {
     "extends": [
@@ -35,16 +36,20 @@
   "dependencies": {
     "@emotion/react": "^11.1.5",
     "@types/lodash": "^4.14.168",
-    "firebase": "^8.4.3",
+    "firebase": "^8.5.0",
     "lodash": "^4.17.21",
     "react": "^17.0.2",
     "react-dom": "^17.0.2",
     "react-scripts": "4.0.3"
   },
   "devDependencies": {
+    "@types/inquirer": "^7.3.1",
     "@types/node": "^12.0.0",
     "@types/react": "^17.0.0",
     "@types/react-dom": "^17.0.0",
+    "firebase-admin": "^9.7.0",
+    "inquirer": "^8.0.0",
+    "ts-node": "^9.1.1",
     "typescript": "^4.1.2"
   }
 }

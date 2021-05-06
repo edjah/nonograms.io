@@ -2,9 +2,9 @@ import { Nonogram, CellState } from "src/nonogram/nonogram_types";
 import { solveNonogramUsingLogic } from "src/nonogram/nonogram_solver";
 
 /**
- * This will generate a solveable nonogram, but it may not have a unique solution. Additionally, it
- * may generate a nonogram that requires guessing or very advanced techniques that go beyond
- * standard human abilities.
+ * This will generate a solveable black and white nonogram, but it may not have a unique solution.
+ * Additionally, it may generate a nonogram that requires guessing or very advanced techniques that
+ * go beyond standard human abilities.
  */
 export function generateRandomNonogram(size: number, fillProbability: number = 0.75): Nonogram {
   const solvedNonogramCells: Array<Array<CellState>> = [];

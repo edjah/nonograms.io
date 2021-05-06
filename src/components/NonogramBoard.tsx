@@ -7,8 +7,6 @@ import * as utils from "src/utils/common";
 
 // TODO: improve these styles
 const nonogramBoardStyle = css`
-  border: 1px solid ${colors.black};
-  border-radius: 3px;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -53,7 +51,7 @@ const nonogramBoardStyle = css`
 
     .rowCounts {
       float: left;
-      margin-right: 5px;
+      margin-right: 10px;
 
       > div {
         display: flex;

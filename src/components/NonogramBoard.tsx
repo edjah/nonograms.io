@@ -1,7 +1,7 @@
 /** @jsxImportSource @emotion/react */
 import { css } from "@emotion/react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Nonogram, CellState } from "src/nonogram/nonogram_types";
+import { Nonogram, CellState } from "src/utils/nonogram_types";
 import { colors } from "src/theme";
 import * as utils from "src/utils/common";
 import { realtimeDb } from "src/firebase";
@@ -104,7 +104,8 @@ type CellUpdateAction = {
 
 type GameSessionState = {
   lastUpdatedTime: utils.DateTimeIsoString;
-  cursors: Record<string, { x: number; y: number }>; // Map from userId -> mouse coords
+  // Map from userId -> relative (i.e. percentage based) mouse coords
+  cursors: Record<string, { x: number; y: number }>;
 };
 
 type NonogramBoardProps = {
@@ -297,8 +298,8 @@ export function NonogramBoard(props: NonogramBoardProps) {
           .child("cursors")
           .child(userId)
           .set({
-            x: Math.round(event.clientX - boundingBox.left),
-            y: Math.round(event.clientY - boundingBox.top),
+            x: utils.round((event.clientX - boundingBox.left) / boundingBox.width, 3),
+            y: utils.round((event.clientY - boundingBox.top) / boundingBox.height, 3),
           });
       }
     },
@@ -374,8 +375,8 @@ function Cursor(props: { color: string; x: number; y: number; size: number }) {
     <svg
       style={{
         position: "absolute",
-        left: props.x - props.size / 4,
-        top: props.y,
+        left: `calc(${100 * props.x}% - ${props.size / 4}px)`,
+        top: `${100 * props.y}%`,
         zIndex: 100,
       }}
       fill={props.color}

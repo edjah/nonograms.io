@@ -1,4 +1,4 @@
-import { CellState, Nonogram, NonogramSolution } from "src/nonogram/nonogram_types";
+import { CellState, Nonogram, NonogramSolution } from "src/utils/nonogram_types";
 import * as utils from "src/utils/common";
 
 // This is a collection of functions that take in a nonogram by reference, mutate it to fill in the

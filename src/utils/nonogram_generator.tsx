@@ -1,5 +1,5 @@
-import { Nonogram, CellState } from "src/nonogram/nonogram_types";
-import { solveNonogramUsingLogic } from "src/nonogram/nonogram_solver";
+import { Nonogram, CellState } from "src/utils/nonogram_types";
+import { solveNonogramUsingLogic } from "src/utils/nonogram_solver";
 
 /**
  * This will generate a solveable black and white nonogram, but it may not have a unique solution.
@@ -17,7 +17,13 @@ export function generateRandomNonogram(size: number, fillProbability: number = 0
     }
   }
 
-  const unsolvedNonogram: Nonogram = { rowCounts: [], colCounts: [], cells: [] };
+  const unsolvedNonogram: Nonogram = {
+    title: "Random Nonogram",
+    rowCounts: [],
+    colCounts: [],
+    cells: [],
+  };
+
   for (let i = 0; i < size; ++i) {
     const rowCounts: Array<number> = [];
     const colCounts: Array<number> = [];

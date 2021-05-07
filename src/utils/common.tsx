@@ -8,6 +8,10 @@ export function randInt(lowInclusive: number, highExclusive: number) {
   return Math.floor(lowInclusive + r);
 }
 
+export function round(num: number, digits: number = 0): number {
+  return parseFloat(num.toFixed(digits));
+}
+
 export function assert(value: unknown): asserts value {
   if (!value) {
     throw new Error(`Assertion failed : ${value}`);

@@ -7,6 +7,8 @@ export enum CellState {
 type Color = string; // colors are hex strings (e.g. #aabbcc)
 
 export type Nonogram = {
+  title: string;
+  hiddenTitle?: string;
   rowCounts: Array<Array<number>>;
   colCounts: Array<Array<number>>;
   cells: Array<Array<CellState>>;

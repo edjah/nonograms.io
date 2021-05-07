@@ -1,5 +1,6 @@
 import firebase from "firebase/app";
 import "firebase/firestore";
+import "firebase/database";
 
 firebase.initializeApp({
   apiKey: "AIzaSyANO_PX2eipnVtVzbHKogFzQv32jWk4-58",
@@ -12,3 +13,4 @@ firebase.initializeApp({
 });
 
 export const firestore = firebase.firestore();
+export const realtimeDb = firebase.database();

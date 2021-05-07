@@ -1,9 +1,12 @@
 /** @jsxImportSource @emotion/react */
 import { css } from "@emotion/react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Nonogram, CellState } from "src/nonogram/nonogram_types";
 import { colors } from "src/theme";
 import * as utils from "src/utils/common";
+import { realtimeDb } from "src/firebase";
+import firebase from "firebase";
+import { useUserId } from "src/utils/hooks";
 
 // TODO: improve these styles
 const nonogramBoardStyle = css`
@@ -12,6 +15,8 @@ const nonogramBoardStyle = css`
   align-items: center;
 
   .gameBoard {
+    position: relative;
+
     .cellGrid {
       display: grid;
       gap: 0px;
@@ -97,6 +102,11 @@ type CellUpdateAction = {
   affectedCells: Array<{ row: number; col: number }>;
 };
 
+type GameSessionState = {
+  lastUpdatedTime: utils.DateTimeIsoString;
+  cursors: Record<string, { x: number; y: number }>; // Map from userId -> mouse coords
+};
+
 type NonogramBoardProps = {
   nonogram: Nonogram;
   onCellUpdated: (row: number, col: number, newCellState: CellState) => void;
@@ -107,6 +117,31 @@ export function NonogramBoard(props: NonogramBoardProps) {
   const [actionState, setActionState] = useState<CellUpdateAction | null>(null);
   const actionLog = useRef<Array<CellUpdateAction>>([]);
   const numValidActionsInLog = useRef<number>(0);
+  // const [realtimeGameSessionId, setRealtimeGameSessionId] = useState<string | null>(null);
+  const [realtimeGameSessionId] = useState<string | null>("test-abcdefg");
+  const [gameSessionState, setGameSessionState] = useState<GameSessionState | null>(null);
+  const [gameSessionRef, setGameSessionRef] = useState<firebase.database.Reference | null>(null);
+  const gameBoardRef = useRef<HTMLDivElement | null>(null);
+  const userId = useUserId();
+
+  useEffect(() => {
+    if (!realtimeGameSessionId) {
+      return;
+    }
+
+    const gameSessionRef = realtimeDb.ref(realtimeGameSessionId);
+    setGameSessionRef(gameSessionRef);
+
+    // TODO: use more granular callbacks like child_added, child_changed, etc
+    const onGameSessionStateChange = (snap: firebase.database.DataSnapshot) => {
+      setGameSessionState(snap.val());
+    };
+
+    gameSessionRef.on("value", onGameSessionStateChange);
+    return () => {
+      gameSessionRef.off("value", onGameSessionStateChange);
+    };
+  }, [realtimeGameSessionId]);
 
   const undoLastAction = useCallback(() => {
     if (numValidActionsInLog.current > 0) {
@@ -251,6 +286,25 @@ export function NonogramBoard(props: NonogramBoardProps) {
     [actionState, nonogram, onCellUpdated]
   );
 
+  const onMouseMove = useCallback(
+    (event: React.MouseEvent) => {
+      if (gameSessionRef && gameBoardRef.current) {
+        // Send an event to firebase about this user's cursor current position.
+        // TODO: throttle this?
+        const boundingBox = gameBoardRef.current.getBoundingClientRect();
+        gameSessionRef.child("lastUpdatedTime").set(new Date().toISOString());
+        gameSessionRef
+          .child("cursors")
+          .child(userId)
+          .set({
+            x: Math.round(event.clientX - boundingBox.left),
+            y: Math.round(event.clientY - boundingBox.top),
+          });
+      }
+    },
+    [gameSessionRef, userId]
+  );
+
   const renderedCells = [];
   for (let row = 0; row < nonogram.cells.length; ++row) {
     for (let col = 0; col < nonogram.cells[row].length; ++col) {
@@ -270,7 +324,15 @@ export function NonogramBoard(props: NonogramBoardProps) {
   const gridCellSize = "40px"; // TODO: make this responsive
   return (
     <div css={nonogramBoardStyle} onContextMenu={(e) => e.preventDefault()}>
-      <div className="gameBoard">
+      <div className="gameBoard" ref={gameBoardRef} onMouseMove={onMouseMove}>
+        {gameSessionState &&
+          Object.entries(gameSessionState.cursors).map(([cursorUserId, { x, y }]) => {
+            // Don't render a cursor for yourself
+            if (cursorUserId === userId) {
+              return null;
+            }
+            return <Cursor key={cursorUserId} color="#ff2222" x={x} y={y} size={20} />;
+          })}
         <div className="colCounts">
           {colCounts.map((counts, col) => (
             <div key={col}>
@@ -304,5 +366,25 @@ export function NonogramBoard(props: NonogramBoardProps) {
         </div>
       </div>
     </div>
+  );
+}
+
+function Cursor(props: { color: string; x: number; y: number; size: number }) {
+  return (
+    <svg
+      style={{
+        position: "absolute",
+        left: props.x - props.size / 4,
+        top: props.y,
+        zIndex: 100,
+      }}
+      fill={props.color}
+      width={props.size}
+      height={props.size}
+      viewBox="0 0 24 24"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path d="M6 0l14.4 13.4-6 .6h-1l.5 1 3.5 7.8-2.6 1.2-3.4-7.9-.4-1-.8.8L6 19.8V0" />
+    </svg>
   );
 }

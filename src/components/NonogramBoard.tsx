@@ -1,12 +1,14 @@
 /** @jsxImportSource @emotion/react */
 import { css } from "@emotion/react";
-import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Nonogram, CellState } from "src/utils/nonogram_types";
+import React, { useCallback, useEffect, useRef } from "react";
+import {
+  Nonogram,
+  CellState,
+  CellUpdateAction,
+  GameSessionUserState,
+} from "src/utils/nonogram_types";
 import { colors } from "src/theme";
 import * as utils from "src/utils/common";
-import { realtimeDb } from "src/firebase";
-import firebase from "firebase";
-import { useUserId } from "src/utils/hooks";
 
 // TODO: improve these styles
 const nonogramBoardStyle = css`
@@ -93,91 +95,34 @@ const nonogramBoardStyle = css`
   }
 `;
 
-type CellUpdateAction = {
-  originalCellState: CellState;
-  updatedCellState: CellState;
-  startRow: number;
-  startCol: number;
-  dragDirection: "vertical" | "horizontal" | null;
-  affectedCells: Array<{ row: number; col: number }>;
-};
-
-type GameSessionState = {
-  lastUpdatedTime: utils.DateTimeIsoString;
-  // Map from userId -> relative (i.e. percentage based) mouse coords
-  cursors: Record<string, { x: number; y: number }>;
-};
-
-type NonogramBoardProps = {
+export function NonogramBoard(props: {
   nonogram: Nonogram;
+  otherUsers: Record<UserId, GameSessionUserState>;
   onCellUpdated: (row: number, col: number, newCellState: CellState) => void;
-};
+  onCursorPositionChange: (x: number, y: number) => void;
+  undoLastAction: () => void; // TODO: make this return a boolean indicating success/failure?
+  redoAction: () => void; // TODO: make this return a boolean indicating success/failure?
+  addToActionLog: (action: CellUpdateAction) => void;
+}) {
+  const {
+    nonogram,
+    otherUsers,
+    onCellUpdated,
+    onCursorPositionChange,
+    undoLastAction,
+    redoAction,
+    addToActionLog,
+  } = props;
 
-export function NonogramBoard(props: NonogramBoardProps) {
-  const { nonogram, onCellUpdated } = props;
-  const [actionState, setActionState] = useState<CellUpdateAction | null>(null);
-  const actionLog = useRef<Array<CellUpdateAction>>([]);
-  const numValidActionsInLog = useRef<number>(0);
-  // const [realtimeGameSessionId, setRealtimeGameSessionId] = useState<string | null>(null);
-  const [realtimeGameSessionId] = useState<string | null>("test-abcdefg");
-  const [gameSessionState, setGameSessionState] = useState<GameSessionState | null>(null);
-  const [gameSessionRef, setGameSessionRef] = useState<firebase.database.Reference | null>(null);
+  const currentActionRef = useRef<CellUpdateAction | null>(null);
   const gameBoardRef = useRef<HTMLDivElement | null>(null);
-  const userId = useUserId();
-
-  useEffect(() => {
-    if (!realtimeGameSessionId) {
-      return;
-    }
-
-    const gameSessionRef = realtimeDb.ref(realtimeGameSessionId);
-    setGameSessionRef(gameSessionRef);
-
-    // TODO: use more granular callbacks like child_added, child_changed, etc
-    const onGameSessionStateChange = (snap: firebase.database.DataSnapshot) => {
-      setGameSessionState(snap.val());
-    };
-
-    gameSessionRef.on("value", onGameSessionStateChange);
-    return () => {
-      gameSessionRef.off("value", onGameSessionStateChange);
-    };
-  }, [realtimeGameSessionId]);
-
-  const undoLastAction = useCallback(() => {
-    if (numValidActionsInLog.current > 0) {
-      const actionToUndo = actionLog.current[--numValidActionsInLog.current];
-      for (const { row, col } of actionToUndo.affectedCells) {
-        onCellUpdated(row, col, actionToUndo.originalCellState);
-      }
-    }
-  }, [onCellUpdated]);
-
-  const redoAction = useCallback(() => {
-    if (numValidActionsInLog.current < actionLog.current.length) {
-      const actionToRedo = actionLog.current[numValidActionsInLog.current++];
-      for (const { row, col } of actionToRedo.affectedCells) {
-        onCellUpdated(row, col, actionToRedo.updatedCellState);
-      }
-    }
-  }, [onCellUpdated]);
 
   useEffect(() => {
     const onMouseUp = () => {
-      setActionState((oldActionState) => {
-        if (oldActionState) {
-          // React is running this function multiple times, so we need to check that the last
-          // action log entry is not identical to the current action state to avoid duplicates.
-          // TODO: figure out why this is running multiple times.
-          actionLog.current.splice(numValidActionsInLog.current);
-          const lastLoggedAction = actionLog.current[actionLog.current.length - 1];
-          if (!utils.deepEqual(lastLoggedAction, oldActionState)) {
-            actionLog.current.push(oldActionState);
-            numValidActionsInLog.current = actionLog.current.length;
-          }
-        }
-        return null;
-      });
+      if (currentActionRef.current) {
+        addToActionLog(currentActionRef.current);
+      }
+      currentActionRef.current = null;
     };
 
     // TODO: make sure this doesn't mess with any text boxes
@@ -212,13 +157,13 @@ export function NonogramBoard(props: NonogramBoardProps) {
       window.removeEventListener("mouseup", onMouseUp);
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [undoLastAction, redoAction]);
+  }, [undoLastAction, redoAction, addToActionLog]);
 
   const onMouseDown = useCallback(
     (row: number, col: number, currentCellState: CellState, mouseButton: number) => {
       // mouseButton of 0 -> left click | mouseButton of 2 -> right click
       if (mouseButton !== 0 && mouseButton !== 2) {
-        setActionState(null);
+        currentActionRef.current = null;
         return;
       }
 
@@ -231,14 +176,14 @@ export function NonogramBoard(props: NonogramBoardProps) {
           currentCellState === CellState.CROSSED_OUT ? CellState.BLANK : CellState.CROSSED_OUT;
       }
 
-      setActionState({
+      currentActionRef.current = {
         originalCellState: currentCellState,
         updatedCellState,
         startRow: row,
         startCol: col,
         dragDirection: null,
         affectedCells: [{ row, col }],
-      });
+      };
 
       onCellUpdated(row, col, updatedCellState);
     },
@@ -247,20 +192,22 @@ export function NonogramBoard(props: NonogramBoardProps) {
 
   const onMouseOver = useCallback(
     (row: number, col: number) => {
-      if (!actionState) {
+      if (!currentActionRef.current) {
         return;
       }
-      const { originalCellState, updatedCellState, startRow, startCol } = actionState;
+
+      const {
+        originalCellState,
+        updatedCellState,
+        startRow,
+        startCol,
+        dragDirection,
+      } = currentActionRef.current;
 
       // When we're dragging, we only allow one row or one column at a time to be modified to reduce
       // the chance of accidental changes.
-      let { dragDirection } = actionState;
       if (dragDirection === null && (row !== startRow || col !== startCol)) {
-        dragDirection = row !== startRow ? "vertical" : "horizontal";
-        setActionState({
-          ...actionState,
-          dragDirection,
-        });
+        currentActionRef.current.dragDirection = row !== startRow ? "vertical" : "horizontal";
       }
 
       let targetRow, targetCol;
@@ -276,34 +223,28 @@ export function NonogramBoard(props: NonogramBoardProps) {
       // was originally in state X.
       const targetCellState = nonogram.cells[targetRow][targetCol];
       if (targetCellState === originalCellState) {
-        setActionState({
-          ...actionState,
-          dragDirection,
-          affectedCells: [...actionState.affectedCells, { row: targetRow, col: targetCol }],
-        });
+        currentActionRef.current.affectedCells.push({ row: targetRow, col: targetCol });
         onCellUpdated(targetRow, targetCol, updatedCellState);
       }
     },
-    [actionState, nonogram, onCellUpdated]
+    [nonogram, onCellUpdated]
   );
 
   const onMouseMove = useCallback(
     (event: React.MouseEvent) => {
-      if (gameSessionRef && gameBoardRef.current) {
-        // Send an event to firebase about this user's cursor current position.
-        // TODO: throttle this?
+      if (utils.isRateLimited("onCursorPositionChange", 20)) {
+        return;
+      }
+
+      if (gameBoardRef.current) {
         const boundingBox = gameBoardRef.current.getBoundingClientRect();
-        gameSessionRef.child("lastUpdatedTime").set(new Date().toISOString());
-        gameSessionRef
-          .child("cursors")
-          .child(userId)
-          .set({
-            x: utils.round((event.clientX - boundingBox.left) / boundingBox.width, 3),
-            y: utils.round((event.clientY - boundingBox.top) / boundingBox.height, 3),
-          });
+        onCursorPositionChange(
+          utils.round((event.clientX - boundingBox.left) / boundingBox.width, 3),
+          utils.round((event.clientY - boundingBox.top) / boundingBox.height, 3)
+        );
       }
     },
-    [gameSessionRef, userId]
+    [onCursorPositionChange]
   );
 
   const renderedCells = [];
@@ -326,14 +267,10 @@ export function NonogramBoard(props: NonogramBoardProps) {
   return (
     <div css={nonogramBoardStyle} onContextMenu={(e) => e.preventDefault()}>
       <div className="gameBoard" ref={gameBoardRef} onMouseMove={onMouseMove}>
-        {gameSessionState &&
-          Object.entries(gameSessionState.cursors).map(([cursorUserId, { x, y }]) => {
-            // Don't render a cursor for yourself
-            if (cursorUserId === userId) {
-              return null;
-            }
-            return <Cursor key={cursorUserId} color="#ff2222" x={x} y={y} size={20} />;
-          })}
+        {Object.entries(otherUsers).map(([userId, { cursor, color }]) => (
+          // TODO: make the cursor size responsive.
+          <Cursor key={userId} color={color} x={cursor.x} y={cursor.y} size={20} />
+        ))}
         <div className="colCounts">
           {colCounts.map((counts, col) => (
             <div key={col}>

@@ -1,29 +1,29 @@
 import lodashDeepClone from "lodash/cloneDeep";
 import lodashDeepEqual from "lodash/isEqual";
 
-export type DateTimeIsoString = string;
-
 export function randInt(lowInclusive: number, highExclusive: number) {
   const r = Math.random() * (highExclusive - lowInclusive);
   return Math.floor(lowInclusive + r);
+}
+
+export function randomChoice<T>(items: Array<T>): T {
+  return items[randInt(0, items.length)];
 }
 
 export function round(num: number, digits: number = 0): number {
   return parseFloat(num.toFixed(digits));
 }
 
+export function omit<T extends object, K extends keyof T>(obj: T, key: K): FlattenType<Omit<T, K>> {
+  const objClone = { ...obj };
+  delete objClone[key];
+  return objClone;
+}
+
 export function assert(value: unknown): asserts value {
   if (!value) {
     throw new Error(`Assertion failed : ${value}`);
   }
-}
-
-export function deepClone<T>(obj: T): T {
-  return lodashDeepClone(obj);
-}
-
-export function deepEqual(left: unknown, right: unknown): boolean {
-  return lodashDeepEqual(left, right);
 }
 
 export function setTimeoutAsync(duration: number): Promise<void> {
@@ -38,3 +38,22 @@ export function generateRandomHexString(length: number) {
     .call(randomBytes, (byte) => ("0" + byte.toString(16)).substr(-2))
     .join("");
 }
+
+const lastRunTimestampByKey: Record<string, number> = {};
+
+/**
+ * This function will return true if the key is not allowed to run because of rate limiting, and
+ * false otherwise.
+ */
+export function isRateLimited(key: string, intervalMs: number): boolean {
+  const lastRunTimestamp = lastRunTimestampByKey[key];
+  if (lastRunTimestamp && Date.now() < lastRunTimestamp + intervalMs) {
+    return true;
+  }
+  lastRunTimestampByKey[key] = Date.now();
+  return false;
+}
+
+// Lodash re-exports
+export const deepClone = lodashDeepClone;
+export const deepEqual = lodashDeepEqual;

@@ -2,29 +2,46 @@
 import { css } from "@emotion/react";
 import { useEffect, useMemo, useState, useCallback } from "react";
 import * as utils from "src/utils/common";
-import firebase from "firebase";
-import { realtimeDb } from "src/firebase";
+import { firebase, realtimeDb } from "src/firebase";
 import { Nonogram, GameSessionState, CellState, CellUpdateAction } from "src/utils/nonogram_types";
 import { useOfflineUser } from "src/utils/users";
 import { NonogramBoard } from "src/components/NonogramBoard";
 import { User } from "src/utils/users";
+import { useHistory } from "react-router";
+import { colors } from "src/theme";
+
+// 30 minutes
+const INACTIVE_USER_TIMEOUT_MS = 30 * 60 * 1000;
 
 const nonogramGameStyle = css`
-  // TODO
-`;
+  .shareLink {
+    margin-top: 30px;
+    text-align: center;
+    margin-left: 30px;
 
-// TODO: switch the dates to firebase.database.ServerValue.TIMESTAMP
-// TODO: figure out offline (i.e. gameSessionId=null)
+    input {
+      padding: 8px;
+      line-height: 1.4;
+      width: 100%;
+      margin-bottom: 2px;
+    }
+
+    span {
+      font-size: 13px;
+      color: ${colors.gray};
+    }
+  }
+`;
 
 function getInitialGameSessionState(originalNonogram: Nonogram, user: User): GameSessionState {
   return {
-    lastUpdatedTime: new Date().toISOString(),
+    lastUpdatedTime: Date.now(),
     nonogram: originalNonogram,
     users: {
       [user.id]: {
         name: user.name,
         color: user.color,
-        lastActiveTime: new Date().toISOString(),
+        lastActiveTime: Date.now(),
         cursor: { x: 0, y: 0 },
       },
     },
@@ -44,55 +61,44 @@ export function NonogramGame(props: {
   boardId: string;
   gameSessionId: string | null;
   nonogram: Nonogram;
+  gameSessionRef: firebase.database.Reference | null;
 }) {
-  const { gameSessionId, nonogram: originalNonogram } = props;
+  const { boardId, gameSessionId, gameSessionRef, nonogram: originalNonogram } = props;
   const user = useOfflineUser();
-
-  // All of our state management will go through Firebase. Even when the user is playing offline,
-  // we continue to use Firebase's API (albeit in offline mode) for simplicity.
-  const gameSessionRef = useMemo(() => {
-    if (gameSessionId) {
-      // TODO: check if the gameSessionId exists first
-      return realtimeDb.ref(gameSessionId);
-    } else {
-      return null;
-    }
-  }, [gameSessionId]);
+  const history = useHistory();
 
   const [gameSessionState, setGameSessionState] = useState<GameSessionState>(() => {
     return getInitialGameSessionState(originalNonogram, user);
   });
 
-  // Set up a listener for changes from Firebase
   useEffect(() => {
     if (!gameSessionRef) {
       return;
     }
 
-    let isInitialSync = true;
-
+    // Define a callback function for changes from Firebase, but don't register it yet.
     const onGameSessionStateChange = (snap: firebase.database.DataSnapshot) => {
-      // It's likely that the first snapshot we read from Firebase will be blank, so we need to
-      // correct that by setting its value to the default initial state for the nonogram.
-      let snapshotValue = snap.val();
-      if (!snapshotValue) {
-        snapshotValue = getInitialGameSessionState(originalNonogram, user);
-        gameSessionRef.set(snapshotValue);
-      }
+      const snapshotValue: GameSessionState = snap.val();
+      fixGameSessionStateFromFirebaseSnapshot(snapshotValue);
 
-      // If this user is connecting to an existing game, we also need to make sure that Firebase has
-      // the metadata (e.g. name and color) about the current user.
-      if (isInitialSync) {
+      // Add in this user's metadata to the game session if it doesn't exist.
+      if (!snapshotValue.users[user.id]?.name || !snapshotValue.users[user.id]?.color) {
         gameSessionRef.child(`users/${user.id}`).set({
           name: user.name,
           color: user.color,
-          lastActiveTime: new Date().toISOString(),
+          lastActiveTime: Date.now(),
           cursor: { x: 0, y: 0 },
         });
-        isInitialSync = false;
       }
 
-      fixGameSessionStateFromFirebaseSnapshot(snapshotValue);
+      // We also want to remove inactive users from the game session's state.
+      for (const [userId, connectedUser] of Object.entries(snapshotValue.users)) {
+        if (connectedUser.lastActiveTime + INACTIVE_USER_TIMEOUT_MS < Date.now()) {
+          gameSessionRef.child(`users/${userId}`).remove();
+          delete snapshotValue.users[userId];
+        }
+      }
+
       setGameSessionState(snapshotValue);
     };
 
@@ -100,7 +106,7 @@ export function NonogramGame(props: {
     return () => {
       gameSessionRef.off("value", onGameSessionStateChange);
     };
-  }, [gameSessionRef, originalNonogram, user]);
+  }, [gameSessionRef, user, boardId]);
 
   // These callback functions have different behavior depending on whether the user is actively
   // connected to a realtime game session or is playing offline. If playing offline, we manually
@@ -110,13 +116,15 @@ export function NonogramGame(props: {
   const onCellUpdated = useCallback(
     (row: number, col: number, newCellState: CellState) => {
       if (gameSessionRef) {
-        gameSessionRef.child("lastUpdatedTime").set(new Date().toISOString());
+        // TODO: figure out why using firebase.database.ServerValue.TIMESTAMP is causing transaction
+        // failures.
+        gameSessionRef.child("lastUpdatedTime").set(Date.now());
         gameSessionRef.child(`nonogram/cells/${row}/${col}`).set(newCellState);
       } else {
         setGameSessionState((prevState) => {
           // TODO: avoid a deep clone
           const newState = utils.deepClone(prevState);
-          newState.lastUpdatedTime = new Date().toISOString();
+          newState.lastUpdatedTime = Date.now();
           newState.nonogram.cells[row][col] = newCellState;
           return newState;
         });
@@ -131,7 +139,7 @@ export function NonogramGame(props: {
         gameSessionRef.child(`users/${user.id}/cursor`).set({ x, y });
         // Rate limit lastActiveTime messages to once per second to reduce bandwidth
         if (!utils.isRateLimited("lastActiveTimeUpdate", 1000)) {
-          gameSessionRef.child(`users/${user.id}/lastActiveTime`).set(new Date().toISOString());
+          gameSessionRef.child(`users/${user.id}/lastActiveTime`).set(Date.now());
         }
       } else {
         // No need to save cursor state for an offline game
@@ -191,6 +199,12 @@ export function NonogramGame(props: {
     [applyGameSessionStateTransaction]
   );
 
+  // If we're not currently in a session, we will create a new one using this ID.
+  const tentativeGameSessionId = useMemo(() => utils.generateRandomBase62String(8), []);
+  const shareUrl = `${window.location.origin}/board/${boardId}?session=${
+    gameSessionId || tentativeGameSessionId
+  }`;
+
   return (
     <div css={nonogramGameStyle}>
       <NonogramBoard
@@ -202,6 +216,31 @@ export function NonogramGame(props: {
         redoAction={redoAction}
         addToActionLog={addToActionLog}
       />
+
+      <div className="shareLink">
+        <input
+          onClick={(event) => {
+            // Copy the URL to the clipboard
+            utils.assert(event.target instanceof HTMLInputElement);
+            event.target.select();
+            document.execCommand("copy");
+
+            // Create a new game session in Firebase
+            if (!gameSessionId) {
+              realtimeDb
+                .ref(tentativeGameSessionId)
+                .set(gameSessionState)
+                .then(() => {
+                  // Once that's happened, update the URL so that the gameSessionId updates
+                  history.replace(`/board/${boardId}?session=${tentativeGameSessionId}`);
+                });
+            }
+          }}
+          value={shareUrl}
+          readOnly
+        />
+        <span>Share this link with your friends to play together.</span>
+      </div>
     </div>
   );
 }

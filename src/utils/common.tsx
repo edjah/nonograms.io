@@ -17,7 +17,7 @@ export function round(num: number, digits: number = 0): number {
 export function omit<T extends object, K extends keyof T>(
   obj: T,
   keys: K | Array<K>
-): FlattenType<Omit<T, K>> {
+): Record<string, any> extends T ? T : FlattenType<Omit<T, K>> {
   const objClone = { ...obj };
   if (Array.isArray(keys)) {
     for (const key of keys) {
@@ -26,7 +26,8 @@ export function omit<T extends object, K extends keyof T>(
   } else {
     delete objClone[keys];
   }
-  return objClone;
+  // TODO: fix typescript hacks
+  return objClone as any;
 }
 
 export function assert(value: unknown): asserts value {

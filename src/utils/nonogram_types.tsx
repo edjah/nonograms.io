@@ -31,13 +31,13 @@ export type CellUpdateAction = {
 export type GameSessionUserState = {
   name: string;
   color: Color;
-  lastActiveTime: DateTimeIsoString;
+  lastActiveTime: TimestampMs;
   /** Percentage based mouse coords. Example: {x: 0.123, y: 0.992} */
   cursor: { x: number; y: number };
 };
 
 export type GameSessionState = {
-  lastUpdatedTime: DateTimeIsoString;
+  lastUpdatedTime: TimestampMs;
   nonogram: Nonogram;
   users: Record<UserId, GameSessionUserState>;
   actionLog: Array<CellUpdateAction>;

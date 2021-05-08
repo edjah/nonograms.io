@@ -35,7 +35,7 @@ export function App() {
           <Route path="/" component={HomePage} exact />
           <Route path="/help" component={HelpPage} exact />
           <Route path="/about" component={AboutPage} exact />
-          <Route path="/game/:boardId/" component={GamePage} exact />
+          <Route path="/board/:boardId/" component={GamePage} exact />
           <Route path="*" component={NotFoundPage} />
         </Switch>
       </div>

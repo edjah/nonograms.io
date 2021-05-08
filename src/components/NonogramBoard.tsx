@@ -38,6 +38,7 @@ const nonogramBoardStyle = css`
         }
 
         &.${CellState.CROSSED_OUT} {
+          background-color: ${colors.white};
           display: flex;
           align-items: center;
           justify-content: center;

@@ -21,7 +21,7 @@ export function AboutPage() {
         design and ideas for this site were inspired by sites like{" "}
         <ExternalLink href="https://setwithfriends.com/">Set with Friends</ExternalLink> and{" "}
         <ExternalLink href="https://downforacross.com/beta">Down for a Cross</ExternalLink>. The
-        source code that runs nonograms.io is freely available on{" "}
+        source code that powers nonograms.io is freely available on{" "}
         <ExternalLink href="https://github.com/edjah/nonograms.io">GitHub</ExternalLink>.
       </p>
       <p>
@@ -29,8 +29,7 @@ export function AboutPage() {
         <ExternalLink href="https://github.com/edjah/nonograms.io/issues">
           file an issue
         </ExternalLink>{" "}
-        on GitHub or consider making a pull request. Alternatively, you can email me at{" "}
-        <a href="mailto:nenya@nonograms.io">nenya@nonograms.io</a>.
+        on GitHub, or consider making a pull request.
       </p>
     </div>
   );

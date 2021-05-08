@@ -5,8 +5,8 @@ type GameLevel = {
 };
 
 export const gameLevels: Array<GameLevel> = [
-  { level: 1, firebaseObjectId: "EmFdVTknkvhmG7M0tGWs", difficulty: "easy" },
-  { level: 2, firebaseObjectId: "EmFdVTknkvhmG7M0tGWs", difficulty: "medium" },
-  { level: 3, firebaseObjectId: "EmFdVTknkvhmG7M0tGWs", difficulty: "hard" },
+  { level: 1, firebaseObjectId: "EmFdVTkn", difficulty: "easy" },
+  { level: 2, firebaseObjectId: "EmFdVTkn", difficulty: "medium" },
+  { level: 3, firebaseObjectId: "EmFdVTkn", difficulty: "hard" },
   // TODO: implement more levels
 ];

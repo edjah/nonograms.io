@@ -12,5 +12,6 @@ firebase.initializeApp({
   measurementId: "G-06DSN1ZPRH",
 });
 
+export { firebase };
 export const firestore = firebase.firestore();
 export const realtimeDb = firebase.database();

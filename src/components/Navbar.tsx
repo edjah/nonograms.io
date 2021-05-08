@@ -12,32 +12,14 @@ const navbarStyle = css`
     flex-direction: row;
     align-items: center;
     height: 40px;
-    gap: 5px;
+    gap: 10px;
+
+    h1 {
+      margin-top: 15px;
+    }
 
     .logo {
       height: 100%;
-
-      @media (prefers-reduced-motion: no-preference) {
-        animation: App-logo-spin infinite 10s linear;
-      }
-
-      @keyframes App-logo-spin {
-        0% {
-          transform: rotate(0deg);
-        }
-        49.999% {
-          transform: rotate(0deg);
-        }
-        50% {
-          transform: rotate(90deg);
-        }
-        99.999% {
-          transform: rotate(90deg);
-        }
-        100% {
-          transform: rotate(0deg);
-        }
-      }
     }
   }
 `;
@@ -46,7 +28,7 @@ export function Navbar() {
   return (
     <header css={navbarStyle}>
       <a className="title" href="/">
-        <Logo className="logo" />
+        <Logo className="logo" animationPeriodSeconds={30} />
         <h1>nonograms.io</h1>
       </a>
     </header>

@@ -1,9 +1,52 @@
-export function Logo(props: { className?: string }) {
+/** @jsxImportSource @emotion/react */
+import { css } from "@emotion/react";
+
+export function Logo(props: { className?: string; animationPeriodSeconds?: number }) {
+  const period = props.animationPeriodSeconds;
+  const animationStyle =
+    period &&
+    css`
+      @media (prefers-reduced-motion: no-preference) {
+        animation: App-logo-spin-${period} infinite ${period}s linear;
+      }
+
+      @keyframes App-logo-spin-${period} {
+        0% {
+          transform: rotate(0deg);
+        }
+        ${25 - 30 / period}% {
+          transform: rotate(0deg);
+        }
+        25% {
+          transform: rotate(90deg);
+        }
+        ${50 - 30 / period}% {
+          transform: rotate(90deg);
+        }
+        50% {
+          transform: rotate(180deg);
+        }
+        ${75 - 30 / period}% {
+          transform: rotate(180deg);
+        }
+        75% {
+          transform: rotate(270deg);
+        }
+        ${100 - 30 / period}% {
+          transform: rotate(270deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+    `;
+
   const pad = 15;
 
   return (
     <svg
       className={props.className}
+      css={animationStyle}
       viewBox="-5 -5 110 110"
       xmlns="http://www.w3.org/2000/svg"
       stroke="#000"

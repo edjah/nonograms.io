@@ -22,7 +22,7 @@ export function useOfflineUser(): User {
   }
 
   const user: User = {
-    id: utils.generateRandomHexString(16),
+    id: utils.generateRandomBase62String(8),
     color: utils.randomChoice(Object.values(utils.omit(colors, "black"))),
     name: "Anonymous " + utils.randomChoice(fruits),
   };

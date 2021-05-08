@@ -41,5 +41,5 @@ export type GameSessionState = {
   nonogram: Nonogram;
   users: Record<UserId, GameSessionUserState>;
   actionLog: Array<CellUpdateAction>;
-  numValidActionsInLog: number;
+  numAppliedActionsInLog: number;
 };

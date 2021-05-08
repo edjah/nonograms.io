@@ -30,13 +30,23 @@ export function setTimeoutAsync(duration: number): Promise<void> {
   return new Promise((cb) => setTimeout(cb, duration));
 }
 
+/** This will generate a cryptographically secure (probably) random base62 string. */
+export function generateRandomBase62String(length: number) {
+  const randomBytes = crypto.getRandomValues(new Uint8Array(Math.ceil((length * 6) / 8)));
+  const asciiString = Array.prototype.map
+    .call(randomBytes, (byte) => String.fromCharCode(byte))
+    .join("");
+  // TODO: this replace may not be kosher
+  return btoa(asciiString).substr(0, length).replace(/\//g, "0").replace(/\+/g, "1");
+}
+
 /** This will generate a cryptographically secure random hex string. */
 export function generateRandomHexString(length: number) {
-  assert(length > 0 && length <= 128 && length % 2 === 0);
   const randomBytes = crypto.getRandomValues(new Uint8Array(length / 2));
-  return Array.prototype.map
+  const hexString = Array.prototype.map
     .call(randomBytes, (byte) => ("0" + byte.toString(16)).substr(-2))
     .join("");
+  return hexString.substr(0, length);
 }
 
 const lastRunTimestampByKey: Record<string, number> = {};

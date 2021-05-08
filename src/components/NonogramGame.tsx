@@ -29,7 +29,7 @@ function getInitialGameSessionState(originalNonogram: Nonogram, user: User): Gam
       },
     },
     actionLog: [],
-    numValidActionsInLog: 0,
+    numAppliedActionsInLog: 0,
   };
 }
 
@@ -52,11 +52,11 @@ export function NonogramGame(props: {
   // we continue to use Firebase's API (albeit in offline mode) for simplicity.
   const gameSessionRef = useMemo(() => {
     if (gameSessionId) {
-      realtimeDb.goOnline();
+      // TODO: check if the gameSessionId exists first
+      return realtimeDb.ref(gameSessionId);
     } else {
-      realtimeDb.goOffline();
+      return null;
     }
-    return realtimeDb.ref(gameSessionId || "fake-offline-game-session");
   }, [gameSessionId]);
 
   const [gameSessionState, setGameSessionState] = useState<GameSessionState>(() => {
@@ -65,6 +65,10 @@ export function NonogramGame(props: {
 
   // Set up a listener for changes from Firebase
   useEffect(() => {
+    if (!gameSessionRef) {
+      return;
+    }
+
     let isInitialSync = true;
 
     const onGameSessionStateChange = (snap: firebase.database.DataSnapshot) => {
@@ -98,62 +102,93 @@ export function NonogramGame(props: {
     };
   }, [gameSessionRef, originalNonogram, user]);
 
-  // Callback functions that take advantage of the Firebase SDK to update both local state as well
-  // as remote state on Firebase.
+  // These callback functions have different behavior depending on whether the user is actively
+  // connected to a realtime game session or is playing offline. If playing offline, we manually
+  // update the React state. If playing online, we take advantage of the local updates provided
+  // by the Firebase SDK in conjunction with the `onGameSessionStateChange` handler above to
+  // skip the manual React state updates.
   const onCellUpdated = useCallback(
     (row: number, col: number, newCellState: CellState) => {
-      gameSessionRef.child("lastUpdatedTime").set(new Date().toISOString());
-      gameSessionRef.child(`nonogram/cells/${row}/${col}`).set(newCellState);
+      if (gameSessionRef) {
+        gameSessionRef.child("lastUpdatedTime").set(new Date().toISOString());
+        gameSessionRef.child(`nonogram/cells/${row}/${col}`).set(newCellState);
+      } else {
+        setGameSessionState((prevState) => {
+          // TODO: avoid a deep clone
+          const newState = utils.deepClone(prevState);
+          newState.lastUpdatedTime = new Date().toISOString();
+          newState.nonogram.cells[row][col] = newCellState;
+          return newState;
+        });
+      }
     },
     [gameSessionRef]
   );
 
   const onCursorPositionChange = useCallback(
     (x: number, y: number) => {
-      gameSessionRef.child(`users/${user.id}/cursor`).set({ x, y });
-      gameSessionRef.child(`users/${user.id}/lastActiveTime`).set(new Date().toISOString());
+      if (gameSessionRef) {
+        gameSessionRef.child(`users/${user.id}/cursor`).set({ x, y });
+        // Rate limit lastActiveTime messages to once per second to reduce bandwidth
+        if (!utils.isRateLimited("lastActiveTimeUpdate", 1000)) {
+          gameSessionRef.child(`users/${user.id}/lastActiveTime`).set(new Date().toISOString());
+        }
+      } else {
+        // No need to save cursor state for an offline game
+      }
     },
     [gameSessionRef, user]
   );
 
   // TOOD: handle transaction failures
+  const applyGameSessionStateTransaction = useCallback(
+    (transactionFn: (state: GameSessionState) => GameSessionState) => {
+      if (gameSessionRef) {
+        gameSessionRef.transaction((snapshotValue: GameSessionState) => {
+          fixGameSessionStateFromFirebaseSnapshot(snapshotValue);
+          return transactionFn(snapshotValue);
+        });
+      } else {
+        setGameSessionState((prevState) => transactionFn(utils.deepClone(prevState)));
+      }
+    },
+    [gameSessionRef]
+  );
+
   const undoLastAction = useCallback(() => {
-    gameSessionRef.transaction((snapshotValue: GameSessionState) => {
-      fixGameSessionStateFromFirebaseSnapshot(snapshotValue);
-      if (snapshotValue.numValidActionsInLog > 0) {
-        const actionToUndo = snapshotValue.actionLog[--snapshotValue.numValidActionsInLog];
+    applyGameSessionStateTransaction((state) => {
+      if (state.numAppliedActionsInLog > 0) {
+        const actionToUndo = state.actionLog[--state.numAppliedActionsInLog];
         for (const { row, col } of actionToUndo.affectedCells) {
-          snapshotValue.nonogram.cells[row][col] = actionToUndo.originalCellState;
+          state.nonogram.cells[row][col] = actionToUndo.originalCellState;
         }
       }
-      return snapshotValue;
+      return state;
     });
-  }, [gameSessionRef]);
+  }, [applyGameSessionStateTransaction]);
 
   const redoAction = useCallback(() => {
-    gameSessionRef.transaction((snapshotValue: GameSessionState) => {
-      fixGameSessionStateFromFirebaseSnapshot(snapshotValue);
-      if (snapshotValue.numValidActionsInLog < snapshotValue.actionLog.length) {
-        const actionToRedo = snapshotValue.actionLog[snapshotValue.numValidActionsInLog++];
+    applyGameSessionStateTransaction((state) => {
+      if (state.numAppliedActionsInLog < state.actionLog.length) {
+        const actionToRedo = state.actionLog[state.numAppliedActionsInLog++];
         for (const { row, col } of actionToRedo.affectedCells) {
-          snapshotValue.nonogram.cells[row][col] = actionToRedo.updatedCellState;
+          state.nonogram.cells[row][col] = actionToRedo.updatedCellState;
         }
       }
-      return snapshotValue;
+      return state;
     });
-  }, [gameSessionRef]);
+  }, [applyGameSessionStateTransaction]);
 
   const addToActionLog = useCallback(
     (action: CellUpdateAction) => {
-      gameSessionRef.transaction((snapshotValue: GameSessionState) => {
-        fixGameSessionStateFromFirebaseSnapshot(snapshotValue);
-        snapshotValue.actionLog.splice(snapshotValue.numValidActionsInLog);
-        snapshotValue.actionLog.push(action);
-        snapshotValue.numValidActionsInLog = snapshotValue.actionLog.length;
-        return snapshotValue;
+      applyGameSessionStateTransaction((state) => {
+        state.actionLog.splice(state.numAppliedActionsInLog);
+        state.actionLog.push(action);
+        state.numAppliedActionsInLog = state.actionLog.length;
+        return state;
       });
     },
-    [gameSessionRef]
+    [applyGameSessionStateTransaction]
   );
 
   return (

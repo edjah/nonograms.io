@@ -1,32 +1,41 @@
 /** @jsxImportSource @emotion/react */
 import { css } from "@emotion/react";
-import logo from "src/static/images/logo.svg";
+import { Logo } from "src/components/Logo";
 
-// TODO: replace the logo with something that actually makes sense.
-// Also potentially consider adding a cool animation to the new logo.
 const navbarStyle = css`
-  margin-top: 10px;
+  margin-top: 20px;
   margin-bottom: 30px;
 
   .title {
+    margin-left: 10px;
     display: inline-flex;
     flex-direction: row;
     align-items: center;
     height: 40px;
+    gap: 5px;
 
     .logo {
-      height: 100%;
+      height: 40px;
 
       @media (prefers-reduced-motion: no-preference) {
-        animation: App-logo-spin infinite 20s linear;
+        animation: App-logo-spin infinite 10s linear;
       }
 
       @keyframes App-logo-spin {
-        from {
+        0% {
           transform: rotate(0deg);
         }
-        to {
-          transform: rotate(360deg);
+        49.999% {
+          transform: rotate(0deg);
+        }
+        50% {
+          transform: rotate(90deg);
+        }
+        99.999% {
+          transform: rotate(90deg);
+        }
+        100% {
+          transform: rotate(0deg);
         }
       }
     }
@@ -37,7 +46,7 @@ export function Navbar() {
   return (
     <header css={navbarStyle}>
       <a className="title" href="/">
-        <img src={logo} className="logo" alt="Nonograms.io logo" />
+        <Logo className="logo" />
         <h1>nonograms.io</h1>
       </a>
     </header>

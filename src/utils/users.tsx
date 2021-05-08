@@ -23,7 +23,7 @@ export function useOfflineUser(): User {
 
   const user: User = {
     id: utils.generateRandomBase62String(8),
-    color: utils.randomChoice(Object.values(utils.omit(colors, "black"))),
+    color: utils.randomChoice(Object.values(utils.omit(colors, ["black", "white", "gray"]))),
     name: "Anonymous " + utils.randomChoice(fruits),
   };
   localStorage.setItem("offlineUser", JSON.stringify(user));

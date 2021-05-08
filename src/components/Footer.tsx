@@ -4,8 +4,7 @@ import { Link } from "react-router-dom";
 
 const footerStyle = css`
   max-width: 1000px;
-  margin: 0 auto;
-  margin-top: 30px;
+  margin: 50px auto;
 
   display: flex;
   justify-content: center;
@@ -21,7 +20,6 @@ export function Footer() {
     <footer css={footerStyle}>
       <Link to="/about/">About</Link>
       <Link to="/help/">Help</Link>
-      {/* TODO: add more footer entries */}
     </footer>
   );
 }

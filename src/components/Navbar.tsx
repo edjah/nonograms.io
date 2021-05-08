@@ -7,7 +7,7 @@ const navbarStyle = css`
   margin-bottom: 30px;
 
   .title {
-    margin-left: 10px;
+    margin-left: 20px;
     display: inline-flex;
     flex-direction: row;
     align-items: center;
@@ -15,7 +15,7 @@ const navbarStyle = css`
     gap: 5px;
 
     .logo {
-      height: 40px;
+      height: 100%;
 
       @media (prefers-reduced-motion: no-preference) {
         animation: App-logo-spin infinite 10s linear;

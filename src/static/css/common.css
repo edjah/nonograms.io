@@ -7,4 +7,18 @@ body {
 a {
   color: #121212;
   text-decoration: none;
+  opacity: 0.8;
+}
+
+a:hover {
+  opacity: 1;
+}
+
+p {
+  line-height: 1.4;
+  margin-bottom: 30px;
+}
+
+p a {
+  color: #e4256e;
 }

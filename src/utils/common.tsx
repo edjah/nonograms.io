@@ -14,9 +14,18 @@ export function round(num: number, digits: number = 0): number {
   return parseFloat(num.toFixed(digits));
 }
 
-export function omit<T extends object, K extends keyof T>(obj: T, key: K): FlattenType<Omit<T, K>> {
+export function omit<T extends object, K extends keyof T>(
+  obj: T,
+  keys: K | Array<K>
+): FlattenType<Omit<T, K>> {
   const objClone = { ...obj };
-  delete objClone[key];
+  if (Array.isArray(keys)) {
+    for (const key of keys) {
+      delete objClone[key];
+    }
+  } else {
+    delete objClone[keys];
+  }
   return objClone;
 }
 

@@ -98,7 +98,7 @@ const nonogramBoardStyle = css`
 
 export function NonogramBoard(props: {
   nonogram: Nonogram;
-  otherUsers: Record<UserId, GameSessionUserState>;
+  activeUsers: Record<UserId, GameSessionUserState>;
   onCellUpdated: (row: number, col: number, newCellState: CellState) => void;
   onCursorPositionChange: (x: number, y: number) => void;
   undoLastAction: () => void; // TODO: make this return a boolean indicating success/failure?
@@ -107,7 +107,7 @@ export function NonogramBoard(props: {
 }) {
   const {
     nonogram,
-    otherUsers,
+    activeUsers,
     onCellUpdated,
     onCursorPositionChange,
     undoLastAction,
@@ -126,8 +126,12 @@ export function NonogramBoard(props: {
       currentActionRef.current = null;
     };
 
-    // TODO: make sure this doesn't mess with any text boxes
     const onKeyDown = (event: KeyboardEvent) => {
+      // Don't run this if an input is currently in focus.
+      if (document.activeElement instanceof HTMLInputElement) {
+        return;
+      }
+
       switch (event.code) {
         case "KeyZ":
           if (event.ctrlKey || event.metaKey) {
@@ -268,7 +272,7 @@ export function NonogramBoard(props: {
   return (
     <div css={nonogramBoardStyle} onContextMenu={(e) => e.preventDefault()}>
       <div className="gameBoard" ref={gameBoardRef} onMouseMove={onMouseMove}>
-        {Object.entries(otherUsers).map(([userId, { cursor, color }]) => (
+        {Object.entries(activeUsers).map(([userId, { cursor, color }]) => (
           // TODO: make the cursor size responsive.
           <Cursor key={userId} color={color} x={cursor.x} y={cursor.y} size={20} />
         ))}

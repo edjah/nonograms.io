@@ -18,7 +18,7 @@ export function NotFoundPage() {
   return (
     <div css={notFoundPageStyle}>
       <h1>Page not found</h1>
-      <Logo className="logo" animationPeriodSeconds={10} />
+      <Logo className="logo" animationPeriodSeconds={7.5} />
     </div>
   );
 }

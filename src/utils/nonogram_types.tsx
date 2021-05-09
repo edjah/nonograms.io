@@ -36,10 +36,19 @@ export type GameSessionUserState = {
   cursor: { x: number; y: number };
 };
 
+export type ChatMessage = {
+  timestamp: TimestampMs;
+  userId: UserId;
+  message: string;
+};
+
 export type GameSessionState = {
   lastUpdatedTime: TimestampMs;
-  nonogram: Nonogram;
   users: Record<UserId, GameSessionUserState>;
-  actionLog: Array<CellUpdateAction>;
-  numAppliedActionsInLog: number;
+  gameState: {
+    nonogram: Nonogram;
+    actionLog: Array<CellUpdateAction>;
+    numAppliedActionsInLog: number;
+  };
+  chatLog: Array<ChatMessage>;
 };

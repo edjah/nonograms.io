@@ -1,16 +1,20 @@
 /** @jsxImportSource @emotion/react */
 import { css } from "@emotion/react";
+import { useMemo } from "react";
+import * as utils from "src/utils/common";
 
 export function Logo(props: { className?: string; animationPeriodSeconds?: number }) {
   const period = props.animationPeriodSeconds;
+  const animationKey = useMemo(() => utils.generateRandomBase62String(8), []);
+
   const animationStyle =
     period &&
     css`
       @media (prefers-reduced-motion: no-preference) {
-        animation: App-logo-spin-${period} infinite ${period}s linear;
+        animation: ${animationKey} infinite ${period}s linear;
       }
 
-      @keyframes App-logo-spin-${period} {
+      @keyframes ${animationKey} {
         0% {
           transform: rotate(0deg);
         }

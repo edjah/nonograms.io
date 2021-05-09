@@ -9,11 +9,17 @@ import { NonogramBoard } from "src/components/NonogramBoard";
 import { User } from "src/utils/users";
 import { useHistory } from "react-router";
 import { colors } from "src/theme";
+import { ChatLog } from "src/components/ChatLog";
 
 // 30 minutes
 const INACTIVE_USER_TIMEOUT_MS = 30 * 60 * 1000;
 
 const nonogramGameStyle = css`
+  .upperUi {
+    display: flex;
+    gap: 30px;
+  }
+
   .shareLink {
     margin-top: 30px;
     text-align: center;
@@ -36,7 +42,6 @@ const nonogramGameStyle = css`
 function getInitialGameSessionState(originalNonogram: Nonogram, user: User): GameSessionState {
   return {
     lastUpdatedTime: Date.now(),
-    nonogram: originalNonogram,
     users: {
       [user.id]: {
         name: user.name,
@@ -45,15 +50,31 @@ function getInitialGameSessionState(originalNonogram: Nonogram, user: User): Gam
         cursor: { x: 0, y: 0 },
       },
     },
-    actionLog: [],
-    numAppliedActionsInLog: 0,
+    gameState: {
+      nonogram: originalNonogram,
+      actionLog: [],
+      numAppliedActionsInLog: 0,
+    },
+    chatLog: [],
   };
 }
 
 function fixGameSessionStateFromFirebaseSnapshot(snapshotValue: GameSessionState): void {
-  // An empty action log gets cleared out by Firebase, so we need to re-add it as an empty array.
-  if (!snapshotValue.actionLog) {
-    snapshotValue.actionLog = [];
+  // Firebase Realtime doesn't save empty arrays/objects. It just deletes the associated keys
+  // instead, so we need to add them back in before we use the snapshot data in code.
+  if (!snapshotValue.gameState.actionLog) {
+    snapshotValue.gameState.actionLog = [];
+  }
+  if (!snapshotValue.users) {
+    snapshotValue.users = {};
+  }
+
+  // Additionally, Firebase represents the chat log as a map from UUIDs -> ChatMessage, so we need
+  // to convert that back into an array.
+  if (!snapshotValue.chatLog) {
+    snapshotValue.chatLog = [];
+  } else {
+    snapshotValue.chatLog = Object.values(snapshotValue.chatLog);
   }
 }
 
@@ -76,28 +97,31 @@ export function NonogramGame(props: {
       return;
     }
 
+    let isInitialSync = true;
+
     // Define a callback function for changes from Firebase, but don't register it yet.
     const onGameSessionStateChange = (snap: firebase.database.DataSnapshot) => {
       const snapshotValue: GameSessionState = snap.val();
       fixGameSessionStateFromFirebaseSnapshot(snapshotValue);
 
       // Add in this user's metadata to the game session if it doesn't exist.
-      if (!snapshotValue.users[user.id]?.name || !snapshotValue.users[user.id]?.color) {
-        gameSessionRef.child(`users/${user.id}`).set({
+      if (
+        isInitialSync ||
+        !snapshotValue.users[user.id]?.name ||
+        !snapshotValue.users[user.id]?.color
+      ) {
+        snapshotValue.users[user.id] = {
           name: user.name,
           color: user.color,
           lastActiveTime: Date.now(),
           cursor: { x: 0, y: 0 },
-        });
+        };
+        gameSessionRef.child(`users/${user.id}`).set(snapshotValue.users[user.id]);
       }
 
-      // We also want to remove inactive users from the game session's state.
-      for (const [userId, connectedUser] of Object.entries(snapshotValue.users)) {
-        if (connectedUser.lastActiveTime + INACTIVE_USER_TIMEOUT_MS < Date.now()) {
-          gameSessionRef.child(`users/${userId}`).remove();
-          delete snapshotValue.users[userId];
-        }
-      }
+      // Also modify local state to make sure you know who you are.
+      snapshotValue.users[user.id].name += " (you)";
+      isInitialSync = false;
 
       setGameSessionState(snapshotValue);
     };
@@ -119,13 +143,13 @@ export function NonogramGame(props: {
         // TODO: figure out why using firebase.database.ServerValue.TIMESTAMP is causing transaction
         // failures.
         gameSessionRef.child("lastUpdatedTime").set(Date.now());
-        gameSessionRef.child(`nonogram/cells/${row}/${col}`).set(newCellState);
+        gameSessionRef.child(`gameState/nonogram/cells/${row}/${col}`).set(newCellState);
       } else {
         setGameSessionState((prevState) => {
           // TODO: avoid a deep clone
           const newState = utils.deepClone(prevState);
           newState.lastUpdatedTime = Date.now();
-          newState.nonogram.cells[row][col] = newCellState;
+          newState.gameState.nonogram.cells[row][col] = newCellState;
           return newState;
         });
       }
@@ -150,14 +174,22 @@ export function NonogramGame(props: {
 
   // TOOD: handle transaction failures
   const applyGameSessionStateTransaction = useCallback(
-    (transactionFn: (state: GameSessionState) => GameSessionState) => {
+    (
+      transactionFn: (gameState: GameSessionState["gameState"]) => GameSessionState["gameState"]
+    ) => {
       if (gameSessionRef) {
-        gameSessionRef.transaction((snapshotValue: GameSessionState) => {
-          fixGameSessionStateFromFirebaseSnapshot(snapshotValue);
+        gameSessionRef.child("gameState").transaction((snapshotValue) => {
+          if (!snapshotValue.actionLog) {
+            snapshotValue.actionLog = [];
+          }
           return transactionFn(snapshotValue);
         });
       } else {
-        setGameSessionState((prevState) => transactionFn(utils.deepClone(prevState)));
+        setGameSessionState((prevState) => {
+          const newState = { ...prevState };
+          newState.gameState = transactionFn(utils.deepClone(prevState.gameState));
+          return newState;
+        });
       }
     },
     [gameSessionRef]
@@ -199,24 +231,54 @@ export function NonogramGame(props: {
     [applyGameSessionStateTransaction]
   );
 
+  const sendChatMessage = useCallback(
+    (message: string) => {
+      if (gameSessionRef) {
+        gameSessionRef.child("chatLog").push({
+          timestamp: Date.now(),
+          userId: user.id,
+          message,
+        });
+      }
+    },
+    [gameSessionRef, user]
+  );
+
   // If we're not currently in a session, we will create a new one using this ID.
   const tentativeGameSessionId = useMemo(() => utils.generateRandomBase62String(8), []);
   const shareUrl = `${window.location.origin}/board/${boardId}?session=${
     gameSessionId || tentativeGameSessionId
   }`;
 
+  const activeUsers = { ...gameSessionState.users };
+  for (const [userId, connectedUser] of Object.entries(activeUsers)) {
+    if (connectedUser.lastActiveTime + INACTIVE_USER_TIMEOUT_MS < Date.now()) {
+      delete activeUsers[userId];
+    }
+  }
+
   return (
     <div css={nonogramGameStyle}>
-      <NonogramBoard
-        nonogram={gameSessionState.nonogram}
-        otherUsers={utils.omit(gameSessionState.users, user.id)}
-        onCellUpdated={onCellUpdated}
-        onCursorPositionChange={onCursorPositionChange}
-        undoLastAction={undoLastAction}
-        redoAction={redoAction}
-        addToActionLog={addToActionLog}
-      />
-
+      <div className="upperUi">
+        <NonogramBoard
+          nonogram={gameSessionState.gameState.nonogram}
+          activeUsers={utils.omit(activeUsers, user.id)}
+          onCellUpdated={onCellUpdated}
+          onCursorPositionChange={onCursorPositionChange}
+          undoLastAction={undoLastAction}
+          redoAction={redoAction}
+          addToActionLog={addToActionLog}
+        />
+        {gameSessionRef && (
+          <ChatLog
+            currentUserId={user.id}
+            allUsers={gameSessionState.users}
+            activeUsers={activeUsers}
+            messages={gameSessionState.chatLog}
+            onSendMessage={sendChatMessage}
+          />
+        )}
+      </div>
       <div className="shareLink">
         <input
           onClick={(event) => {

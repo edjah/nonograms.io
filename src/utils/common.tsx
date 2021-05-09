@@ -74,6 +74,14 @@ export function isRateLimited(key: string, intervalMs: number): boolean {
   return false;
 }
 
+export function englishPluralize(count: number, item: string, pluralForm?: string): string {
+  if (count === 1) {
+    return `1 ${item}`;
+  } else {
+    return pluralForm ? `${count} ${pluralForm}` : `${count} ${item}s`;
+  }
+}
+
 // Lodash re-exports
 export const deepClone = lodashDeepClone;
 export const deepEqual = lodashDeepEqual;

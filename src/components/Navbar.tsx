@@ -15,6 +15,7 @@ const navbarStyle = css`
     gap: 10px;
 
     h1 {
+      font-weight: 300;
       margin-top: 15px;
     }
 

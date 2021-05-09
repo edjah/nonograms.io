@@ -32,8 +32,6 @@ export type GameSessionUserState = {
   name: string;
   color: Color;
   lastActiveTime: TimestampMs;
-  /** Percentage based mouse coords. Example: {x: 0.123, y: 0.992} */
-  cursor: { x: number; y: number };
 };
 
 export type ChatMessage = {
@@ -52,3 +50,11 @@ export type GameSessionState = {
   };
   chatLog: Array<ChatMessage>;
 };
+
+/**
+ * Map from UserId -> Percentage based mouse coords. Example: {x: 0.123, y: 0.992}.
+ * Note that even though these are technically part of the GameSessionState, since they change
+ * so frequently, we store the React state associated with them outside of the main GameSessionState
+ * to minimize the performance impact.
+ */
+export type UserCursorPositions = Record<UserId, { x: number; y: number }>;

@@ -2,6 +2,10 @@ import { colors } from "src/theme";
 import * as utils from "src/utils/common";
 import { fruits } from "src/utils/fake_data";
 import { useRef } from "react";
+import { GameSessionUserState } from "src/utils/nonogram_types";
+
+// 30 minutes
+export const INACTIVE_USER_TIMEOUT_MS = 30 * 60 * 1000;
 
 export type User = {
   id: UserId;
@@ -29,4 +33,8 @@ export function useOfflineUser(): User {
   localStorage.setItem("offlineUser", JSON.stringify(user));
   userRef.current = user;
   return userRef.current;
+}
+
+export function isUserSessionInactive(userSession: GameSessionUserState): boolean {
+  return userSession.lastActiveTime + INACTIVE_USER_TIMEOUT_MS < Date.now();
 }

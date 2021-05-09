@@ -5,12 +5,16 @@ export enum CellState {
 }
 
 export type Nonogram = {
+  id: string;
   title: string;
+  /** This only gets revealed after the nonogram is solved. */
+  secondaryTitle?: string;
   rowCounts: Array<Array<number>>;
   colCounts: Array<Array<number>>;
   cells: Array<Array<CellState>>;
-  /** This only gets revealed after the nonogram is solved. */
-  secondaryTitle?: string;
+  // NOTE: having a single "solution" field assumes that the nonogram has a unique solution.
+  // TODO: Write a script to verify that this is true for all boards on the site.
+  solution: Array<Array<CellState>>;
   /** If present, the colors will be filled in with a fancy animation after the board is solved. */
   solutionColors?: Array<Array<Color>>;
 };

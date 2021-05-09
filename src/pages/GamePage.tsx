@@ -55,7 +55,10 @@ export function GamePage(props: RouteComponentProps<{ boardId: string; gameSessi
       if (!data) {
         setErrorMessage("The nonogram you requested does not exist.");
       } else {
-        setActiveNonogram(JSON.parse(data.boardJson));
+        const parsedNonogram = JSON.parse(data.boardJson);
+        parsedNonogram.title = data.title ?? parsedNonogram.title;
+        parsedNonogram.secondaryTitle = data.secondaryTitle ?? parsedNonogram.secondaryTitle;
+        setActiveNonogram(parsedNonogram);
       }
       setIsLoading(false);
     });

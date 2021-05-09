@@ -22,6 +22,7 @@ export function generateRandomNonogram(size: number, fillProbability: number = 0
     rowCounts: [],
     colCounts: [],
     cells: [],
+    solution: solvedNonogramCells,
   };
 
   for (let i = 0; i < size; ++i) {

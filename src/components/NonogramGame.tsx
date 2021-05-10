@@ -18,11 +18,12 @@ import { CollaboratorCursors } from "src/components/CollaboratorCursors";
 import { GameControls } from "src/components/GameControls";
 import { useHistory } from "react-router";
 import { triggerFireworks } from "src/components/Confetti";
+import { saveLocalGameState } from "src/utils/localStorage";
 
 const nonogramGameStyle = css`
   .upperUi {
     display: flex;
-    gap: 30px;
+    gap: 60px;
 
     .boardContainer {
       position: relative;
@@ -118,6 +119,9 @@ export function NonogramGame(props: {
   }, [gameSessionState.gameState.nonogram]);
 
   useEffect(() => {
+    // TODO: move this
+    saveLocalGameState(boardId, { status: "inProgress" });
+
     if (!gameSessionRef) {
       return;
     }
@@ -347,6 +351,7 @@ export function NonogramGame(props: {
   // https://www.youtube.com/watch?v=3GwjfUFyY6M
   useEffect(() => {
     if (solutionStatus.isSolved && boardId === gameSessionState.boardId) {
+      saveLocalGameState(boardId, { status: "solved" });
       triggerFireworks({ durationMs: 1000 });
     }
   }, [solutionStatus.isSolved, boardId, gameSessionState.boardId]);
@@ -375,6 +380,7 @@ export function NonogramGame(props: {
                   return { ...prevState, gameState: freshGameState };
                 });
               }
+              saveLocalGameState(boardId, { status: "inProgress" });
             }}
             goToNextLevel={
               originalNonogram.nextBoardId

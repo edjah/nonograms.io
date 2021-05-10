@@ -8,6 +8,10 @@ import { isUserSessionInactive } from "src/utils/users";
 
 // TODO: make these styles not hardcoded pixel values, and make them responsive.
 const chatLogStyle = css`
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+
   .activeUsers {
     display: flex;
     flex-direction: column;

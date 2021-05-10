@@ -10,6 +10,7 @@ const buttonStyle = css`
   box-sizing: border-box;
   padding: 5px 15px;
   cursor: pointer;
+  text-align: center;
   transition: all 0.2s;
 
   :hover {

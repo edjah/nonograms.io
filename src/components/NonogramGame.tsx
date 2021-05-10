@@ -1,14 +1,22 @@
 /** @jsxImportSource @emotion/react */
 import { css } from "@emotion/react";
-import React, { useRef, useEffect, useState, useCallback } from "react";
+import React, { useRef, useEffect, useState, useCallback, useMemo } from "react";
 import * as utils from "src/utils/common";
 import { firebase } from "src/firebase";
-import { Nonogram, GameSessionState, CellState, CellUpdateAction } from "src/utils/nonogram_types";
+import {
+  Nonogram,
+  GameSessionState,
+  CellState,
+  CellUpdateAction,
+  SolutionCorrectnessStatus,
+} from "src/utils/nonogram_types";
 import { useOfflineUser } from "src/utils/users";
 import { NonogramBoard } from "src/components/NonogramBoard";
 import { ChatLog } from "src/components/ChatLog";
 import { ShareLink } from "src/components/ShareLink";
 import { CollaboratorCursors } from "src/components/CollaboratorCursors";
+import { GameControls } from "src/components/GameControls";
+import { useHistory } from "react-router";
 
 const nonogramGameStyle = css`
   .upperUi {
@@ -17,6 +25,8 @@ const nonogramGameStyle = css`
 
     .boardContainer {
       position: relative;
+      height: 100%;
+      width: 100%;
     }
   }
 `;
@@ -26,13 +36,22 @@ export function NonogramGame(props: {
   gameSessionId: string | null;
   nonogram: Nonogram;
   gameSessionRef: firebase.database.Reference | null;
+  onChangeBoardId: (nextBoardId: string) => void;
 }) {
-  const { boardId, gameSessionId, gameSessionRef, nonogram: originalNonogram } = props;
+  const {
+    boardId,
+    gameSessionId,
+    gameSessionRef,
+    nonogram: originalNonogram,
+    onChangeBoardId,
+  } = props;
   const user = useOfflineUser();
   const boardContainerRef = useRef<HTMLDivElement | null>(null);
+  const history = useHistory();
 
   const [gameSessionState, setGameSessionState] = useState<GameSessionState>(() => {
     return {
+      boardId,
       lastUpdatedTime: Date.now(),
       users: {
         [user.id]: {
@@ -50,6 +69,53 @@ export function NonogramGame(props: {
     };
   });
 
+  const solutionStatus = useMemo<SolutionCorrectnessStatus>(() => {
+    // NOTE: we're not comparing against the solution field in the nonogram just in case
+    // the nonogram doesn't have a unique solution even though it really should.
+    const { cells, rowCounts, colCounts } = gameSessionState.gameState.nonogram;
+    const numFilledCells = utils.sum(
+      cells.map((row) => utils.sum(row.map((cell) => Number(cell === CellState.FILLED))))
+    );
+    const totalNumCellsToFill = utils.sum(rowCounts.map((counts) => utils.sum(counts)));
+
+    function isLineWrong(line: Array<CellState>, expectedStreaks: Array<number>): boolean {
+      const streaksInLine = [];
+      let currentStreak = 0;
+      for (const cellState of line) {
+        if (cellState === CellState.FILLED) {
+          currentStreak += 1;
+        } else if (currentStreak > 0) {
+          streaksInLine.push(currentStreak);
+          currentStreak = 0;
+        }
+      }
+
+      if (currentStreak > 0) {
+        streaksInLine.push(currentStreak);
+      }
+
+      return !utils.deepEqual(streaksInLine, expectedStreaks);
+    }
+
+    let numMistakes = 0;
+    for (let i = 0; i < rowCounts.length; ++i) {
+      numMistakes += Number(isLineWrong(cells[i], rowCounts[i]));
+    }
+
+    for (let i = 0; i < colCounts.length; ++i) {
+      const col = cells.map((row) => row[i]);
+      numMistakes += Number(isLineWrong(col, colCounts[i]));
+    }
+
+    return {
+      isSolved: numMistakes === 0 && numFilledCells === totalNumCellsToFill,
+      isNotCompleteBecauseHasMistakes: numMistakes > 0 && numFilledCells >= totalNumCellsToFill,
+      numMistakes,
+      numFilledCells,
+      totalNumCellsToFill,
+    };
+  }, [gameSessionState.gameState.nonogram]);
+
   useEffect(() => {
     if (!gameSessionRef) {
       return;
@@ -60,6 +126,7 @@ export function NonogramGame(props: {
     const usersRef = gameSessionRef.child("users");
     const gameStateRef = gameSessionRef.child("gameState");
     const chatLogRef = gameSessionRef.child("chatLog");
+    const boardIdRef = gameSessionRef.child("boardId");
 
     // Setting up some event listeners for changes from Firebase Realtime.
     // TODO: consider using even more granular events if performance ends up being bad.
@@ -104,12 +171,21 @@ export function NonogramGame(props: {
       });
     });
 
+    // If the boardId in the game session changes, we will redirect the user to the new board.
+    boardIdRef.on("value", (snap) => {
+      if (snap.val() === boardId) {
+        return;
+      }
+      history.push(`/board/${snap.val()}?session=${gameSessionId}`);
+    });
+
     return () => {
       usersRef.off();
       gameStateRef.off();
       chatLogRef.off();
+      boardIdRef.off();
     };
-  }, [gameSessionRef, user, boardId]);
+  }, [gameSessionRef, user, boardId, gameSessionId, history, originalNonogram]);
 
   // These callback functions have different behavior depending on whether the user is actively
   // connected to a realtime game session or is playing offline. If playing offline, we manually
@@ -275,10 +351,34 @@ export function NonogramGame(props: {
           ref={boardContainerRef}
           onMouseMove={onCursorPositionChange}
         >
+          <GameControls
+            solutionStatus={solutionStatus}
+            resetBoard={() => {
+              const freshGameState = {
+                nonogram: originalNonogram,
+                actionLog: [],
+                numAppliedActionsInLog: 0,
+              };
+
+              if (gameSessionRef) {
+                gameSessionRef.child("gameState").set(freshGameState);
+              } else {
+                setGameSessionState((prevState) => {
+                  return { ...prevState, gameState: freshGameState };
+                });
+              }
+            }}
+            goToNextLevel={
+              originalNonogram.nextBoardId
+                ? () => onChangeBoardId(originalNonogram.nextBoardId!)
+                : undefined
+            }
+          />
           <NonogramBoard
             nonogram={gameSessionState.gameState.nonogram}
             onCellUpdated={onCellUpdated}
             addToActionLog={addToActionLog}
+            solutionStatus={solutionStatus}
           />
           <CollaboratorCursors
             gameSessionRef={gameSessionRef}

@@ -1,7 +1,12 @@
 /** @jsxImportSource @emotion/react */
 import { css } from "@emotion/react";
 import React, { useCallback, useEffect, useRef } from "react";
-import { Nonogram, CellState, CellUpdateAction } from "src/utils/nonogram_types";
+import {
+  Nonogram,
+  CellState,
+  CellUpdateAction,
+  SolutionCorrectnessStatus,
+} from "src/utils/nonogram_types";
 import { colors } from "src/theme";
 
 // TODO: improve these styles
@@ -9,6 +14,7 @@ const nonogramBoardStyle = css`
   display: flex;
   justify-content: center;
   align-items: center;
+  height: 100%;
 
   .gameBoard {
     .cellGrid {
@@ -38,6 +44,10 @@ const nonogramBoardStyle = css`
           :after {
             content: "×";
           }
+        }
+
+        &.solved {
+          transition: background-color 3s ease;
         }
       }
     }
@@ -93,11 +103,18 @@ export const NonogramBoard = React.memo(
     nonogram: Nonogram;
     onCellUpdated: (row: number, col: number, newCellState: CellState) => void;
     addToActionLog: (action: CellUpdateAction) => void;
+    solutionStatus: SolutionCorrectnessStatus;
   }) => {
-    const { nonogram, onCellUpdated, addToActionLog } = props;
+    const { nonogram, onCellUpdated, addToActionLog, solutionStatus } = props;
+    const { isSolved, isNotCompleteBecauseHasMistakes } = solutionStatus;
+
     const currentActionRef = useRef<CellUpdateAction | null>(null);
 
     useEffect(() => {
+      if (isSolved) {
+        return;
+      }
+
       const onMouseUp = () => {
         if (currentActionRef.current) {
           addToActionLog(currentActionRef.current);
@@ -109,12 +126,12 @@ export const NonogramBoard = React.memo(
       return () => {
         window.removeEventListener("mouseup", onMouseUp);
       };
-    }, [addToActionLog]);
+    }, [addToActionLog, isSolved]);
 
     const onMouseDown = useCallback(
       (row: number, col: number, currentCellState: CellState, mouseButton: number) => {
         // mouseButton of 0 -> left click | mouseButton of 2 -> right click
-        if (mouseButton !== 0 && mouseButton !== 2) {
+        if (isSolved || (mouseButton !== 0 && mouseButton !== 2)) {
           currentActionRef.current = null;
           return;
         }
@@ -128,6 +145,13 @@ export const NonogramBoard = React.memo(
             currentCellState === CellState.CROSSED_OUT ? CellState.BLANK : CellState.CROSSED_OUT;
         }
 
+        // Disallow filling if the maximum allowable number of cells have been filled, but the
+        // board still has mistakes.
+        if (isNotCompleteBecauseHasMistakes && updatedCellState === CellState.FILLED) {
+          currentActionRef.current = null;
+          return;
+        }
+
         currentActionRef.current = {
           originalCellState: currentCellState,
           updatedCellState,
@@ -139,17 +163,23 @@ export const NonogramBoard = React.memo(
 
         onCellUpdated(row, col, updatedCellState);
       },
-      [onCellUpdated]
+      [onCellUpdated, isNotCompleteBecauseHasMistakes, isSolved]
     );
 
     const onMouseOver = useCallback(
       (row: number, col: number) => {
-        if (!currentActionRef.current) {
+        if (isSolved || !currentActionRef.current) {
           return;
         }
 
         let { startRow, startCol } = currentActionRef.current;
         const { originalCellState, updatedCellState, dragDirection } = currentActionRef.current;
+
+        // Disallow filling if the maximum allowable number of cells have been filled, but the
+        // board still has mistakes.
+        if (isNotCompleteBecauseHasMistakes && updatedCellState === CellState.FILLED) {
+          return;
+        }
 
         // When we're dragging, we only allow one row or one column at a time to be modified to
         // reduce the chance of accidental changes.
@@ -175,17 +205,17 @@ export const NonogramBoard = React.memo(
 
         // Additionally, we only update a cell's state from X to Y if the cell that started the drag
         // was originally in state X.
-        for (let row = startRow; row <= endRow; ++row) {
-          for (let col = startCol; col <= endCol; ++col) {
-            const targetCellState = nonogram.cells[row][col];
+        for (let targetRow = startRow; targetRow <= endRow; ++targetRow) {
+          for (let targetCol = startCol; targetCol <= endCol; ++targetCol) {
+            const targetCellState = nonogram.cells[targetRow][targetCol];
             if (targetCellState === originalCellState) {
-              currentActionRef.current.affectedCells.push({ row, col });
-              onCellUpdated(row, col, updatedCellState);
+              currentActionRef.current.affectedCells.push({ row: targetRow, col: targetCol });
+              onCellUpdated(targetRow, targetCol, updatedCellState);
             }
           }
         }
       },
-      [nonogram, onCellUpdated]
+      [nonogram, onCellUpdated, isSolved, isNotCompleteBecauseHasMistakes]
     );
 
     const renderedCells = [];
@@ -195,7 +225,8 @@ export const NonogramBoard = React.memo(
         renderedCells.push(
           <div
             key={`${row}-${col}`}
-            className={`cell ${cellState}`}
+            className={`cell ${isSolved ? "solved" : cellState}`}
+            style={!isSolved ? undefined : { backgroundColor: nonogram.solutionColors[row][col] }}
             onMouseDown={(event) => onMouseDown(row, col, cellState, event.nativeEvent.button)}
             onMouseOver={() => onMouseOver(row, col)}
           />

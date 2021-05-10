@@ -83,6 +83,7 @@ def generate_nonogram_from_color_image(
         'id': secrets.token_urlsafe(6).replace('-', '0').replace('_', '1'),
         'title': title,
         'secondaryTitle': secondary_title,
+        'nextBoardId': None,
         'rowCounts': [],
         'colCounts': [],
         'cells': [[BLANK for _ in range(width)] for _ in range(height)],

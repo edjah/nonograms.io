@@ -15,12 +15,21 @@ export type Nonogram = {
   // NOTE: having a single "solution" field assumes that the nonogram has a unique solution.
   // TODO: Write a script to verify that this is true for all boards on the site.
   solution: Array<Array<CellState>>;
-  /** If present, the colors will be filled in with a fancy animation after the board is solved. */
-  solutionColors?: Array<Array<Color>>;
+  /** These colors will be filled in with a fancy animation after the board is solved. */
+  solutionColors: Array<Array<Color>>;
+  nextBoardId?: string;
 };
 
 export type NonogramSolution = {
   cells: Array<Array<CellState>>;
+};
+
+export type SolutionCorrectnessStatus = {
+  isSolved: boolean;
+  isNotCompleteBecauseHasMistakes: boolean;
+  numMistakes: number;
+  numFilledCells: number;
+  totalNumCellsToFill: number;
 };
 
 export type CellUpdateAction = {
@@ -45,6 +54,7 @@ export type ChatMessage = {
 };
 
 export type GameSessionState = {
+  boardId: string;
   lastUpdatedTime: TimestampMs;
   users: Record<UserId, GameSessionUserState>;
   gameState: {

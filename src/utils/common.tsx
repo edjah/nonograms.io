@@ -82,6 +82,14 @@ export function englishPluralize(count: number, item: string, pluralForm?: strin
   }
 }
 
+export function sum(arr: Array<number>): number {
+  let total = 0;
+  for (const item of arr) {
+    total += item;
+  }
+  return total;
+}
+
 // Lodash re-exports
 export const deepClone = lodashDeepClone;
 export const deepEqual = lodashDeepEqual;

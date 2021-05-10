@@ -1,5 +1,7 @@
 import { Nonogram, CellState } from "src/utils/nonogram_types";
 import { solveNonogramUsingLogic } from "src/utils/nonogram_solver";
+import { colors } from "src/theme";
+import * as utils from "src/utils/common";
 
 /**
  * This will generate a solveable black and white nonogram, but it may not have a unique solution.
@@ -18,11 +20,15 @@ export function generateRandomNonogram(size: number, fillProbability: number = 0
   }
 
   const unsolvedNonogram: Nonogram = {
+    id: utils.generateRandomBase62String(8),
     title: "Random Nonogram",
     rowCounts: [],
     colCounts: [],
     cells: [],
     solution: solvedNonogramCells,
+    solutionColors: solvedNonogramCells.map((row) =>
+      row.map((cellState) => (cellState === CellState.FILLED ? colors.gray : colors.white))
+    ),
   };
 
   for (let i = 0; i < size; ++i) {

@@ -43,6 +43,7 @@ export function CollaboratorCursors(props: {
 
         return (
           <svg
+            key={userId}
             style={{
               position: "absolute",
               left: `calc(${100 * x}% - ${cursorSize / 4}px)`,

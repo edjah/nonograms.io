@@ -1,7 +1,7 @@
 /** @jsxImportSource @emotion/react */
 import { css } from "@emotion/react";
 import { RouteComponentProps } from "react-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { colors } from "src/theme";
 import { firebase, firestore, realtimeDb } from "src/firebase";
 import { Nonogram } from "src/utils/nonogram_types";
@@ -21,6 +21,7 @@ const gamePageStyle = css`
     border: 1px solid ${colors.black};
     border-radius: 3px;
     min-height: 70vh;
+    padding: 15px;
 
     .errorMessage {
       color: ${colors.red};
@@ -37,6 +38,7 @@ export function GamePage(props: RouteComponentProps<{ boardId: string; gameSessi
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [gameSessionRef, setGameSessionRef] = useState<firebase.database.Reference | null>(null);
+  const [isChangingBoardId, setIsChangingBoardId] = useState(false);
 
   // Load the nonogram definition from Firestore.
   useEffect(() => {
@@ -72,12 +74,11 @@ export function GamePage(props: RouteComponentProps<{ boardId: string; gameSessi
   // the gameSessionId is invalid, the snapshot we get back will be null. At that point, we just
   // message the user that their ID is invalid and clear it out from the URL.
   useEffect(() => {
+    setGameSessionRef(null);
     if (!nonogram || !gameSessionId) {
       return;
     }
-
     setIsLoading(true);
-    setGameSessionRef(null);
 
     let isRequestedCancelled = false;
     const sessionRef = realtimeDb.ref(gameSessionId);
@@ -86,12 +87,31 @@ export function GamePage(props: RouteComponentProps<{ boardId: string; gameSessi
         return;
       }
 
-      if (!snap.val()) {
+      const snapshotValue = snap.val();
+      if (!snapshotValue) {
         // TODO: do better than window.alert?
         window.alert("Game session not found.");
         history.replace(`/board/${boardId}`);
       } else {
-        setGameSessionRef(sessionRef);
+        if (!isChangingBoardId && snapshotValue.boardId !== boardId) {
+          // The sessionId contained in the URL points to a board that does not match the boardId
+          // in the URL, so just get rid of the sessionId from the URL silently. This can happen if
+          // the user clicks the "Back" button after clicking next level.
+          history.replace(`/board/${boardId}`);
+        } else {
+          if (isChangingBoardId) {
+            // If we're changing the boardId (e.g. via the "Next Level" button), then we also need
+            // to reset the gameState of the session.
+            sessionRef.child("boardId").set(boardId);
+            sessionRef.child("gameState").set({
+              nonogram,
+              actionLog: [],
+              numAppliedActionsInLog: 0,
+            });
+            setIsChangingBoardId(false);
+          }
+          setGameSessionRef(sessionRef);
+        }
       }
       setIsLoading(false);
     });
@@ -99,7 +119,25 @@ export function GamePage(props: RouteComponentProps<{ boardId: string; gameSessi
     return () => {
       isRequestedCancelled = true;
     };
-  }, [nonogram, boardId, gameSessionId, history]);
+  }, [nonogram, boardId, gameSessionId, history, isChangingBoardId]);
+
+  const onChangeBoardId = useCallback(
+    (nextBoardId: string) => {
+      if (!nonogram) {
+        return;
+      }
+      setActiveNonogram(null);
+      setGameSessionRef(null);
+
+      if (gameSessionId) {
+        history.push(`/board/${nextBoardId}?session=${gameSessionId}`);
+        setIsChangingBoardId(true);
+      } else {
+        history.push(`/board/${nextBoardId}`);
+      }
+    },
+    [gameSessionId, history, nonogram]
+  );
 
   return (
     <div css={gamePageStyle}>
@@ -118,6 +156,7 @@ export function GamePage(props: RouteComponentProps<{ boardId: string; gameSessi
             gameSessionId={gameSessionId}
             nonogram={nonogram}
             gameSessionRef={gameSessionRef}
+            onChangeBoardId={onChangeBoardId}
           />
         ) : null}
       </div>

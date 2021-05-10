@@ -169,6 +169,7 @@ export const NonogramBoard = React.memo(
     const onMouseOver = useCallback(
       (row: number, col: number) => {
         if (isSolved || !currentActionRef.current) {
+          currentActionRef.current = null;
           return;
         }
 

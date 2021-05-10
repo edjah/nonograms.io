@@ -1,9 +1,12 @@
 import lodashDeepClone from "lodash/cloneDeep";
 import lodashDeepEqual from "lodash/isEqual";
 
+export function randomInRange(min: number, max: number) {
+  return Math.random() * (max - min) + min;
+}
+
 export function randInt(lowInclusive: number, highExclusive: number) {
-  const r = Math.random() * (highExclusive - lowInclusive);
-  return Math.floor(lowInclusive + r);
+  return Math.floor(randomInRange(lowInclusive, highExclusive));
 }
 
 export function randomChoice<T>(items: Array<T>): T {

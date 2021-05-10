@@ -17,6 +17,7 @@ import { ShareLink } from "src/components/ShareLink";
 import { CollaboratorCursors } from "src/components/CollaboratorCursors";
 import { GameControls } from "src/components/GameControls";
 import { useHistory } from "react-router";
+import { triggerFireworks } from "src/components/Confetti";
 
 const nonogramGameStyle = css`
   .upperUi {
@@ -342,6 +343,13 @@ export function NonogramGame(props: {
       window.removeEventListener("keydown", onKeyDown);
     };
   }, [redoAction, undoLastAction]);
+
+  // https://www.youtube.com/watch?v=3GwjfUFyY6M
+  useEffect(() => {
+    if (solutionStatus.isSolved && boardId === gameSessionState.boardId) {
+      triggerFireworks({ durationMs: 1000 });
+    }
+  }, [solutionStatus.isSolved, boardId, gameSessionState.boardId]);
 
   return (
     <div css={nonogramGameStyle}>
